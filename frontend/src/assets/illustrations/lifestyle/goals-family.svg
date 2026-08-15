@@ -1,0 +1,39 @@
+<svg width="560" height="400" viewBox="0 0 560 400" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a family planning their financial goals together around a table">
+  <rect x="0" y="0" width="560" height="400" rx="28" fill="#073A66" />
+  <ellipse cx="280" cy="200" rx="220" ry="90" fill="#0B5FA3" opacity="0.25" transform="rotate(-6 280 200)" />
+
+  <!-- table -->
+  <rect x="140" y="272" width="280" height="16" rx="8" fill="#F8FAFC" opacity="0.9" />
+  <rect x="164" y="288" width="12" height="56" fill="#F8FAFC" opacity="0.9" />
+  <rect x="384" y="288" width="12" height="56" fill="#F8FAFC" opacity="0.9" />
+
+  <!-- tablet on table -->
+  <rect x="240" y="248" width="80" height="52" rx="8" fill="#FFFFFF" />
+  <path d="M254 282l14-10 12 6 18-14" stroke="#0E9384" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+  <!-- adult figure 1 -->
+  <path d="M176 272c0-28 16-48 40-48s40 20 40 48" fill="#C9962B" />
+  <circle cx="216" cy="198" r="26" fill="#C9962B" />
+  <circle cx="207" cy="194" r="2.6" fill="#073A66" />
+  <circle cx="225" cy="194" r="2.6" fill="#073A66" />
+  <path d="M208 208q8 6 16 0" stroke="#073A66" stroke-width="2.2" stroke-linecap="round" fill="none" />
+
+  <!-- adult figure 2 -->
+  <path d="M344 272c0-28 16-48 40-48s40 20 40 48" fill="#0E9384" />
+  <circle cx="384" cy="198" r="26" fill="#0E9384" />
+  <circle cx="375" cy="194" r="2.6" fill="#F8FAFC" />
+  <circle cx="393" cy="194" r="2.6" fill="#F8FAFC" />
+  <path d="M376 208q8 6 16 0" stroke="#F8FAFC" stroke-width="2.2" stroke-linecap="round" fill="none" />
+
+  <!-- child figure (smaller, center) -->
+  <path d="M258 272c0-18 10-32 26-32s26 14 26 32" fill="#F8FAFC" />
+  <circle cx="284" cy="228" r="18" fill="#F8FAFC" />
+  <circle cx="278" cy="225" r="2.2" fill="#073A66" />
+  <circle cx="290" cy="225" r="2.2" fill="#073A66" />
+  <path d="M278 234q6 4 12 0" stroke="#073A66" stroke-width="2" stroke-linecap="round" fill="none" />
+
+  <!-- decorative dots -->
+  <circle cx="470" cy="100" r="6" fill="#C9962B" />
+  <circle cx="100" cy="120" r="4" fill="#F8FAFC" opacity="0.5" />
+  <circle cx="480" cy="300" r="5" fill="#0E9384" />
+</svg>

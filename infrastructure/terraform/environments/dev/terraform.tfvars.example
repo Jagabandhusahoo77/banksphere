@@ -1,0 +1,27 @@
+# Copy to terraform.tfvars (git-ignored — see the repo-root .gitignore)
+# and fill in. Nothing in this file is a real value — see
+# infrastructure/README.md for what each of these actually controls.
+
+aws_region = "us-east-1" # REQUIRED — pick your own region; not defaulted anywhere in this codebase
+
+# REQUIRED — the Git repository Argo CD watches for this environment's
+# desired state (Helm chart + values-dev.yaml). See gitops/README.md —
+# this can be this same repository (its own clone URL) or a separate
+# split-out GitOps repository once you have one.
+gitops_repo_url = ""
+
+# Leave both empty until you have registered a domain — see
+# docs/deployment/dns-and-https.md. The environment deploys and is
+# reachable over plain HTTP on the ALB's own DNS name either way.
+domain_name        = ""
+route53_zone_id     = ""
+create_hosted_zone  = false
+
+# Optional — subscribes this address to the CloudWatch alarms SNS topic.
+alert_email = ""
+
+# Optional — only needed if you set enable_ssh = true (default false;
+# SSM Session Manager is the intended access path and needs neither of
+# these two).
+enable_ssh        = false
+admin_cidr_blocks = [] # e.g. ["203.0.113.4/32"] — your own IP, NEVER 0.0.0.0/0

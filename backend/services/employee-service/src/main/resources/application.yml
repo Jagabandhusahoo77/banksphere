@@ -1,0 +1,65 @@
+server:
+  port: ${SERVER_PORT:8085}
+
+spring:
+  application:
+    name: employee-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:banksphere_employee}
+    username: ${DB_USERNAME:banksphere}
+    password: ${DB_PASSWORD:banksphere_local_dev}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+banksphere:
+  cors:
+    # Employee portal only — deliberately NOT the customer frontend's origin.
+    # The employee portal is a separate application/security boundary; see
+    # ADR-006.
+    allowed-origins: ${EMPLOYEE_PORTAL_CORS_ORIGIN:http://localhost:5174}
+  jwt:
+    # Deliberately a DIFFERENT secret from customer-service's JWT_SECRET —
+    # see ADR-006, Decision 2. A customer JWT must never verify against this
+    # service's key, and vice versa; sharing one secret across both principal
+    # types was considered and rejected.
+    secret: ${EMPLOYEE_JWT_SECRET:banksphere-local-development-only-EMPLOYEE-jwt-signing-secret-change-me-987654321}
+    expiration-seconds: ${EMPLOYEE_JWT_EXPIRATION:1800}
+  downstream:
+    # Phase 9B — the Employee Operations API's server-to-server calls,
+    # forwarding the acting employee's own bearer token (never a shared
+    # internal secret) — see ADR-007.
+    account-service-base-url: ${ACCOUNT_SERVICE_URL:http://localhost:8082}
+    customer-service-base-url: ${CUSTOMER_SERVICE_URL:http://localhost:8081}
+    # Phase 9C — the Customer 360 aggregation's server-to-server calls,
+    # same forwarded-bearer-token pattern as above. See ADR-008.
+    transaction-service-base-url: ${TRANSACTION_SERVICE_URL:http://localhost:8083}
+    beneficiary-service-base-url: ${BENEFICIARY_SERVICE_URL:http://localhost:8084}
+    kyc-service-base-url: ${KYC_SERVICE_URL:http://localhost:8086}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.banksphere.employee: INFO

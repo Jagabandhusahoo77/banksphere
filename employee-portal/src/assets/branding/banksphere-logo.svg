@@ -1,0 +1,23 @@
+<svg width="220" height="56" viewBox="0 0 220 56" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="banksphere-logo-title">
+  <title id="banksphere-logo-title">BankSphere</title>
+  <defs>
+    <linearGradient id="bs-mark-gradient" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B5FA3" />
+      <stop offset="1" stop-color="#073A66" />
+    </linearGradient>
+  </defs>
+
+  <!-- Mark: a badge containing an abstract sphere with an orbit ring —
+       trust (rounded, contained badge) + global/digital banking (sphere +
+       orbit) + growth (the accent node riding the ascending edge of the
+       orbit). Original geometry, not derived from any real bank mark. -->
+  <rect x="0" y="0" width="56" height="56" rx="14" fill="url(#bs-mark-gradient)" />
+  <circle cx="28" cy="28" r="13" fill="none" stroke="#F8FAFC" stroke-width="3" />
+  <ellipse cx="28" cy="28" rx="21" ry="8" fill="none" stroke="#F8FAFC" stroke-width="2.25" opacity="0.9" transform="rotate(-20 28 28)" />
+  <circle cx="46.2" cy="19.8" r="3.4" fill="#C9962B" />
+
+  <!-- Wordmark -->
+  <text x="68" y="36" font-family="-apple-system, 'Segoe UI', Roboto, Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="-0.02em">
+    <tspan fill="#0F172A">Bank</tspan><tspan fill="#0B5FA3">Sphere</tspan>
+  </text>
+</svg>

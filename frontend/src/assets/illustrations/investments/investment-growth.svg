@@ -1,0 +1,11 @@
+<svg width="480" height="360" viewBox="0 0 480 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of an investment portfolio growth chart">
+  <rect x="0" y="0" width="480" height="360" rx="24" fill="#F8EEDA" />
+  <rect x="110" y="220" width="34" height="60" rx="4" fill="#0B5FA3" opacity="0.3" />
+  <rect x="156" y="190" width="34" height="90" rx="4" fill="#0B5FA3" opacity="0.5" />
+  <rect x="202" y="150" width="34" height="130" rx="4" fill="#0B5FA3" opacity="0.75" />
+  <rect x="248" y="110" width="34" height="170" rx="4" fill="#0B5FA3" />
+  <path d="M120 200l46-30 46 20 52-64" stroke="#C9962B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <path d="M240 92h24v24" stroke="#C9962B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <circle cx="330" cy="240" r="30" fill="#0E9384" opacity="0.15" />
+  <circle cx="330" cy="240" r="16" fill="#0E9384" opacity="0.4" />
+</svg>

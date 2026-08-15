@@ -1,0 +1,15 @@
+<svg width="480" height="360" viewBox="0 0 480 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a bank account statement with a rising balance trend">
+  <rect x="0" y="0" width="480" height="360" rx="24" fill="#E7F1FA" />
+  <rect x="90" y="70" width="300" height="220" rx="18" fill="#FFFFFF" />
+  <rect x="118" y="100" width="140" height="14" rx="7" fill="#0F172A" opacity="0.85" />
+  <rect x="118" y="126" width="90" height="10" rx="5" fill="#94A3B8" />
+  <rect x="118" y="160" width="244" height="1" fill="#E2E8F0" />
+  <rect x="118" y="184" width="180" height="12" rx="6" fill="#475569" opacity="0.5" />
+  <rect x="118" y="206" width="150" height="12" rx="6" fill="#475569" opacity="0.5" />
+  <rect x="118" y="228" width="200" height="12" rx="6" fill="#475569" opacity="0.5" />
+  <path d="M118 262l30-18 26 10 36-24 46 16" stroke="#0E9384" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <circle cx="256" cy="246" r="5" fill="#0E9384" />
+  <circle cx="330" cy="60" r="34" fill="#C9962B" opacity="0.18" />
+  <circle cx="330" cy="60" r="20" fill="#C9962B" opacity="0.4" />
+  <circle cx="70" cy="300" r="26" fill="#0B5FA3" opacity="0.15" />
+</svg>

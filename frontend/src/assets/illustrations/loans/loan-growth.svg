@@ -1,0 +1,11 @@
+<svg width="480" height="360" viewBox="0 0 480 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a home with an upward growth chart representing loan approval">
+  <rect x="0" y="0" width="480" height="360" rx="24" fill="#EAF7EE" />
+  <path d="M120 200l70-52 70 52" stroke="#0E9384" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <path d="M136 190v70a6 6 0 0 0 6 6h96a6 6 0 0 0 6-6v-70" stroke="#0E9384" stroke-width="4" stroke-linejoin="round" fill="#FFFFFF" />
+  <rect x="176" y="228" width="28" height="38" fill="#0E9384" opacity="0.25" />
+  <g>
+    <path d="M270 260l30-30 24 18 44-44" stroke="#C9962B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <path d="M344 190h-24v24" stroke="#C9962B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  </g>
+  <circle cx="370" cy="270" r="24" fill="#0B5FA3" opacity="0.12" />
+</svg>

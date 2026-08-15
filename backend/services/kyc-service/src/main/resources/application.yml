@@ -1,0 +1,61 @@
+server:
+  port: ${SERVER_PORT:8086}
+
+spring:
+  application:
+    name: kyc-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:banksphere_kyc}
+    username: ${DB_USERNAME:banksphere}
+    password: ${DB_PASSWORD:banksphere_local_dev}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+banksphere:
+  cors:
+    # KYC is called directly by BOTH portals (the customer for their own
+    # application, the employee for review) — unlike employee-service's
+    # downstream calls in Phase 9B, this is genuinely two real browser
+    # origins, not one. See ADR-008.
+    allowed-origins: ${KYC_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}
+  jwt:
+    # Customer-facing endpoints — must match customer-service's JWT_SECRET. See docs/security/jwt.md.
+    secret: ${JWT_SECRET:banksphere-local-development-only-jwt-signing-secret-change-me-1234567890}
+  employee-jwt:
+    # Employee-facing endpoints — must match employee-service's EMPLOYEE_JWT_SECRET, deliberately separate from the customer secret above. See ADR-006/ADR-007.
+    secret: ${EMPLOYEE_JWT_SECRET:banksphere-local-development-only-EMPLOYEE-jwt-signing-secret-change-me-987654321}
+  kyc:
+    document-storage-path: ${KYC_DOCUMENT_STORAGE_PATH:/data/kyc-documents}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.banksphere.kyc: INFO

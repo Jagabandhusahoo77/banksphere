@@ -1,0 +1,9 @@
+<svg width="240" height="160" viewBox="0 0 240 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration representing a savings piggy bank">
+  <rect x="0" y="0" width="240" height="160" rx="16" fill="#F8EEDA" />
+  <ellipse cx="118" cy="94" rx="52" ry="34" fill="#C9962B" />
+  <circle cx="160" cy="80" r="8" fill="#C9962B" />
+  <rect x="108" y="60" width="20" height="10" rx="4" fill="#C9962B" />
+  <circle cx="94" cy="94" r="3" fill="#073A66" />
+  <line x1="66" y1="120" x2="66" y2="132" stroke="#C9962B" stroke-width="6" stroke-linecap="round" />
+  <line x1="170" y1="120" x2="170" y2="132" stroke="#C9962B" stroke-width="6" stroke-linecap="round" />
+</svg>

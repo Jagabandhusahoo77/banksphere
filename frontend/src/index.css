@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-surface-background text-ink-primary font-sans;
+  }
+
+  /* Visible, consistent focus ring for keyboard navigation across every
+     interactive element, instead of relying on (or removing) the browser
+     default. Never remove :focus-visible outlines without replacing them. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-primary ring-offset-2 ring-offset-white;
+  }
+}
+
+@layer utilities {
+  /* Utility for the one legitimate case where a table needs to scroll
+     horizontally on narrow viewports instead of overflowing the page. */
+  .table-scroll {
+    @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0;
+  }
+}

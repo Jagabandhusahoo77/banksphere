@@ -1,0 +1,8 @@
+<svg width="240" height="160" viewBox="0 0 240 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration representing investment growth">
+  <rect x="0" y="0" width="240" height="160" rx="16" fill="#EAF7EE" />
+  <path d="M64 116l30-24 24 14 40-42 22 16" stroke="#0E9384" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <path d="M156 62h24v24" stroke="#0E9384" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <circle cx="64" cy="116" r="5" fill="#0E9384" />
+  <circle cx="94" cy="92" r="5" fill="#0E9384" />
+  <circle cx="118" cy="106" r="5" fill="#0E9384" />
+</svg>

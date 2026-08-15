@@ -1,0 +1,28 @@
+<svg width="480" height="400" viewBox="0 0 480 400" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a person checking their account balance and making a payment on a mobile phone">
+  <rect x="0" y="0" width="480" height="400" rx="28" fill="#E7F1FA" />
+  <circle cx="380" cy="90" r="50" fill="#0E9384" opacity="0.14" />
+  <circle cx="70" cy="330" r="40" fill="#0B5FA3" opacity="0.1" />
+
+  <!-- figure -->
+  <path d="M150 340c0-46 26-78 66-78s66 32 66 78" fill="#0B5FA3" />
+  <circle cx="216" cy="222" r="38" fill="#0B5FA3" />
+  <circle cx="202" cy="216" r="3.6" fill="#FFFFFF" />
+  <circle cx="230" cy="216" r="3.6" fill="#FFFFFF" />
+  <path d="M203 234q13 9 26 0" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" fill="none" />
+
+  <!-- phone in hand -->
+  <rect x="252" y="200" width="92" height="164" rx="16" fill="#073A66" />
+  <rect x="264" y="216" width="68" height="132" rx="6" fill="#FFFFFF" />
+  <rect x="274" y="228" width="48" height="10" rx="5" fill="#94A3B8" />
+  <rect x="274" y="248" width="48" height="18" rx="6" fill="#0B5FA3" opacity="0.15" />
+  <rect x="280" y="253" width="36" height="8" rx="4" fill="#0B5FA3" />
+  <circle cx="298" cy="292" r="16" fill="#0E9384" opacity="0.15" />
+  <path d="M290 292l6 6 12-14" stroke="#0E9384" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <rect x="278" y="318" width="40" height="8" rx="4" fill="#E2E8F0" />
+  <rect x="278" y="332" width="28" height="8" rx="4" fill="#E2E8F0" />
+
+  <!-- decorative dots -->
+  <circle cx="380" cy="200" r="5" fill="#C9962B" />
+  <circle cx="130" cy="160" r="4" fill="#0E9384" opacity="0.5" />
+  <circle cx="410" cy="300" r="4" fill="#0B5FA3" opacity="0.4" />
+</svg>

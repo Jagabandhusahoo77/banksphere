@@ -1,0 +1,258 @@
+name: banksphere-local
+
+networks:
+  banksphere-network:
+    driver: bridge
+
+volumes:
+  banksphere-postgres-data:
+  banksphere-kyc-documents:
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: banksphere-postgres
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-banksphere}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-banksphere_local_dev}
+      POSTGRES_DB: banksphere_customer
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - banksphere-postgres-data:/var/lib/postgresql/data
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-banksphere}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - banksphere-network
+
+  customer-service:
+    build:
+      context: ../../backend/services/customer-service
+      dockerfile: Dockerfile
+    container_name: banksphere-customer-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: banksphere_customer
+      DB_USERNAME: ${DB_USERNAME:-banksphere}
+      DB_PASSWORD: ${DB_PASSWORD:-banksphere_local_dev}
+      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-5173}
+      JWT_SECRET: ${JWT_SECRET:-banksphere-local-development-only-jwt-signing-secret-change-me-1234567890}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600}
+      # Phase 9B — lets this service recognize (never issue) an
+      # employee-service-signed token on the new employee-lookup
+      # endpoint. See ADR-007.
+      EMPLOYEE_JWT_SECRET: ${EMPLOYEE_JWT_SECRET:-banksphere-local-development-only-EMPLOYEE-jwt-signing-secret-change-me-987654321}
+      # Phase 9D — OTP login + step-up authentication. See ADR-009.
+      OTP_LENGTH: ${OTP_LENGTH:-6}
+      OTP_EXPIRY_SECONDS: ${OTP_EXPIRY_SECONDS:-300}
+      OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
+      OTP_RESEND_COOLDOWN_SECONDS: ${OTP_RESEND_COOLDOWN_SECONDS:-30}
+      OTP_STEP_UP_EXPIRY_SECONDS: ${OTP_STEP_UP_EXPIRY_SECONDS:-300}
+      # Dev-only OTP inbox (GET /api/v1/auth/dev/otp-inbox) — MUST be
+      # false in any real deployment; see DevOtpInboxController's javadoc.
+      OTP_DEV_INBOX_ENABLED: ${OTP_DEV_INBOX_ENABLED:-true}
+      REFRESH_TOKEN_EXPIRY_SECONDS: ${REFRESH_TOKEN_EXPIRY_SECONDS:-1209600}
+      # Local HTTP dev only — a Secure cookie is never sent by the browser
+      # over plain HTTP. MUST be true once this is served over HTTPS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    ports:
+      - "${CUSTOMER_SERVICE_PORT:-8081}:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - banksphere-network
+
+  account-service:
+    build:
+      context: ../../backend/services/account-service
+      dockerfile: Dockerfile
+    container_name: banksphere-account-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: banksphere_account
+      DB_USERNAME: ${DB_USERNAME:-banksphere}
+      DB_PASSWORD: ${DB_PASSWORD:-banksphere_local_dev}
+      TRANSACTION_SERVICE_URL: http://transaction-service:8083
+      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-5173}
+      JWT_SECRET: ${JWT_SECRET:-banksphere-local-development-only-jwt-signing-secret-change-me-1234567890}
+      # Phase 9B — lets this service recognize employee-signed tokens on
+      # the new employee-lookup/employee-deposit endpoints. See ADR-007.
+      EMPLOYEE_JWT_SECRET: ${EMPLOYEE_JWT_SECRET:-banksphere-local-development-only-EMPLOYEE-jwt-signing-secret-change-me-987654321}
+      # Phase 9D — confirming a transfer's step-up challenge before a
+      # high-value transfer executes. See StepUpVerificationClient/ADR-009.
+      CUSTOMER_SERVICE_URL: http://customer-service:8081
+      STEP_UP_TRANSFER_THRESHOLD: ${STEP_UP_TRANSFER_THRESHOLD:-50000.00}
+    ports:
+      - "${ACCOUNT_SERVICE_PORT:-8082}:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - banksphere-network
+
+  transaction-service:
+    build:
+      context: ../../backend/services/transaction-service
+      dockerfile: Dockerfile
+    container_name: banksphere-transaction-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: banksphere_transaction
+      DB_USERNAME: ${DB_USERNAME:-banksphere}
+      DB_PASSWORD: ${DB_PASSWORD:-banksphere_local_dev}
+      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-5173}
+      JWT_SECRET: ${JWT_SECRET:-banksphere-local-development-only-jwt-signing-secret-change-me-1234567890}
+      # Phase 9B — lets POST /api/v1/transactions recognize an
+      # employee-signed token as "a valid JWT" (it never checked identity
+      # beyond that — see ADR-001/ADR-007) when account-service forwards
+      # one on behalf of an employee-initiated cash deposit.
+      EMPLOYEE_JWT_SECRET: ${EMPLOYEE_JWT_SECRET:-banksphere-local-development-only-EMPLOYEE-jwt-signing-secret-change-me-987654321}
+      ACCOUNT_SERVICE_URL: http://account-service:8082
+    ports:
+      - "${TRANSACTION_SERVICE_PORT:-8083}:8083"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - banksphere-network
+
+  beneficiary-service:
+    build:
+      context: ../../backend/services/beneficiary-service
+      dockerfile: Dockerfile
+    container_name: banksphere-beneficiary-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: banksphere_beneficiary
+      DB_USERNAME: ${DB_USERNAME:-banksphere}
+      DB_PASSWORD: ${DB_PASSWORD:-banksphere_local_dev}
+      CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-5173}
+      JWT_SECRET: ${JWT_SECRET:-banksphere-local-development-only-jwt-signing-secret-change-me-1234567890}
+    ports:
+      - "${BENEFICIARY_SERVICE_PORT:-8084}:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - banksphere-network
+
+  employee-service:
+    build:
+      context: ../../backend/services/employee-service
+      dockerfile: Dockerfile
+    container_name: banksphere-employee-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: banksphere_employee
+      DB_USERNAME: ${DB_USERNAME:-banksphere}
+      DB_PASSWORD: ${DB_PASSWORD:-banksphere_local_dev}
+      # Deliberately a DIFFERENT secret from JWT_SECRET above — see
+      # ADR-006. An employee token must never verify against the
+      # customer-facing key, and vice versa.
+      EMPLOYEE_PORTAL_CORS_ORIGIN: http://localhost:${EMPLOYEE_PORTAL_PORT:-5174}
+      EMPLOYEE_JWT_SECRET: ${EMPLOYEE_JWT_SECRET:-banksphere-local-development-only-EMPLOYEE-jwt-signing-secret-change-me-987654321}
+      EMPLOYEE_JWT_EXPIRATION: ${EMPLOYEE_JWT_EXPIRATION:-1800}
+      # Phase 9B — the Employee Operations API's server-to-server calls,
+      # forwarding the acting employee's own bearer token (never a shared
+      # internal secret). See ADR-007.
+      ACCOUNT_SERVICE_URL: http://account-service:8082
+      CUSTOMER_SERVICE_URL: http://customer-service:8081
+      # Phase 9C — added for the Customer 360 aggregation endpoint, same
+      # forwarded-bearer-token pattern as above. See ADR-008.
+      TRANSACTION_SERVICE_URL: http://transaction-service:8083
+      BENEFICIARY_SERVICE_URL: http://beneficiary-service:8084
+      KYC_SERVICE_URL: http://kyc-service:8086
+    ports:
+      - "${EMPLOYEE_SERVICE_PORT:-8085}:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - banksphere-network
+
+  # Phase 9C — a dedicated bounded domain for KYC applications/documents,
+  # NOT a sub-module of employee-service (see the "employee portal is a
+  # channel, not the owner of every banking domain" principle in
+  # ADR-008). Called directly by both frontend (customer KYC flow) and
+  # employee-portal (KYC review flow), each with its own JWT — see
+  # application.yml's two-origin CORS deviation, documented inline there.
+  kyc-service:
+    build:
+      context: ../../backend/services/kyc-service
+      dockerfile: Dockerfile
+    container_name: banksphere-kyc-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: banksphere_kyc
+      DB_USERNAME: ${DB_USERNAME:-banksphere}
+      DB_PASSWORD: ${DB_PASSWORD:-banksphere_local_dev}
+      KYC_CORS_ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-5173},http://localhost:${EMPLOYEE_PORTAL_PORT:-5174}
+      JWT_SECRET: ${JWT_SECRET:-banksphere-local-development-only-jwt-signing-secret-change-me-1234567890}
+      EMPLOYEE_JWT_SECRET: ${EMPLOYEE_JWT_SECRET:-banksphere-local-development-only-EMPLOYEE-jwt-signing-secret-change-me-987654321}
+      KYC_DOCUMENT_STORAGE_PATH: /data/kyc-documents
+    ports:
+      - "${KYC_SERVICE_PORT:-8086}:8086"
+    volumes:
+      - banksphere-kyc-documents:/data/kyc-documents
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - banksphere-network
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_CUSTOMER_SERVICE_URL: http://localhost:${CUSTOMER_SERVICE_PORT:-8081}
+        VITE_ACCOUNT_SERVICE_URL: http://localhost:${ACCOUNT_SERVICE_PORT:-8082}
+        VITE_TRANSACTION_SERVICE_URL: http://localhost:${TRANSACTION_SERVICE_PORT:-8083}
+        VITE_BENEFICIARY_SERVICE_URL: http://localhost:${BENEFICIARY_SERVICE_PORT:-8084}
+        VITE_KYC_SERVICE_URL: http://localhost:${KYC_SERVICE_PORT:-8086}
+    container_name: banksphere-frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - customer-service
+      - account-service
+      - transaction-service
+      - beneficiary-service
+      - kyc-service
+    networks:
+      - banksphere-network
+
+  # Separate application, separate security boundary from `frontend` above
+  # (the customer portal) — see ADR-006, Decision 1. Deliberately its own
+  # compose service, its own origin/port, its own Dockerfile/nginx config,
+  # not a second route inside the customer frontend's SPA.
+  employee-portal:
+    build:
+      context: ../../employee-portal
+      dockerfile: Dockerfile
+      args:
+        VITE_EMPLOYEE_SERVICE_URL: http://localhost:${EMPLOYEE_SERVICE_PORT:-8085}
+        # Phase 9C — KYC review endpoints are called directly (not proxied
+        # through employee-service), same "genuine bounded domain" pattern
+        # as beneficiary-service. See ADR-008.
+        VITE_KYC_SERVICE_URL: http://localhost:${KYC_SERVICE_PORT:-8086}
+    container_name: banksphere-employee-portal
+    ports:
+      - "${EMPLOYEE_PORTAL_PORT:-5174}:80"
+    depends_on:
+      - employee-service
+      - kyc-service
+    networks:
+      - banksphere-network

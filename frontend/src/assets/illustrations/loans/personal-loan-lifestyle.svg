@@ -1,0 +1,8 @@
+<svg width="200" height="160" viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a wallet with coins, representing personal loans">
+  <rect x="0" y="0" width="200" height="160" rx="18" fill="#E7F1FA" />
+  <rect x="58" y="66" width="84" height="56" rx="10" fill="#FFFFFF" stroke="#0E9384" stroke-width="3" />
+  <path d="M58 84h84" stroke="#0E9384" stroke-width="3" />
+  <circle cx="118" cy="94" r="7" fill="#0E9384" />
+  <circle cx="72" cy="52" r="9" fill="#C9962B" opacity="0.7" />
+  <circle cx="90" cy="46" r="9" fill="#C9962B" opacity="0.5" />
+</svg>

@@ -1,0 +1,63 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: account-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:banksphere_account}
+    username: ${DB_USERNAME:banksphere}
+    password: ${DB_PASSWORD:banksphere_local_dev}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+banksphere:
+  transaction-service:
+    base-url: ${TRANSACTION_SERVICE_URL:http://localhost:8083}
+  customer-service:
+    # Phase 9D — used only to confirm a step-up challenge before a
+    # high-value transfer executes; see StepUpVerificationClient.
+    base-url: ${CUSTOMER_SERVICE_URL:http://localhost:8081}
+  step-up-policy:
+    # Phase 9D — transfers at or above this amount require a verified
+    # step-up OTP challenge; see StepUpPolicy and ADR-009. Illustrative
+    # BankSphere demo threshold, not a real regulatory figure.
+    transfer-threshold: ${STEP_UP_TRANSFER_THRESHOLD:50000.00}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  jwt:
+    # Must match customer-service's JWT_SECRET exactly — see docs/security/jwt.md.
+    secret: ${JWT_SECRET:banksphere-local-development-only-jwt-signing-secret-change-me-1234567890}
+  employee-jwt:
+    # Must match employee-service's EMPLOYEE_JWT_SECRET exactly — a
+    # deliberately SEPARATE secret from banksphere.jwt.secret above, never
+    # shared with the customer-facing key. See ADR-006/ADR-007.
+    secret: ${EMPLOYEE_JWT_SECRET:banksphere-local-development-only-EMPLOYEE-jwt-signing-secret-change-me-987654321}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.banksphere.account: INFO

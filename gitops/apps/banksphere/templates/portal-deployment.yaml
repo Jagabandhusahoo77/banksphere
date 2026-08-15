@@ -1,0 +1,52 @@
+{{- $root := . }}
+{{- range $key, $portal := .Values.portals }}
+{{- if $portal.enabled }}
+# Reference/fallback only — see values.yaml's own comment on why this is
+# disabled by default in every real environment (portals are served via
+# S3 + CloudFront, not Kubernetes). Vite bakes VITE_*_URL values into the
+# static build at image-build time (see frontend/Dockerfile /
+# employee-portal/Dockerfile build args) — there is nothing left to
+# configure at container-runtime, hence no env block here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $portal.repository }}
+  labels:
+    {{- include "banksphere.labels" $root | nindent 4 }}
+    app.kubernetes.io/name: {{ $portal.repository }}
+spec:
+  replicas: {{ $portal.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $portal.repository }}
+  template:
+    metadata:
+      labels:
+        {{- include "banksphere.labels" $root | nindent 8 }}
+        app.kubernetes.io/name: {{ $portal.repository }}
+    spec:
+      imagePullSecrets:
+        - name: {{ $root.Values.imagePullSecrets.name }}
+      containers:
+        - name: {{ $portal.repository }}
+          image: {{ include "banksphere.image" (dict "registry" $root.Values.image.registry "repositoryPrefix" $root.Values.image.repositoryPrefix "repository" $portal.repository "tag" $root.Values.image.tag) }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $portal.port }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ $portal.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ $portal.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml $portal.resources | nindent 12 }}
+---
+{{- end }}
+{{- end }}

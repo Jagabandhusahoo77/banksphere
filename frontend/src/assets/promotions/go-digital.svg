@@ -1,0 +1,12 @@
+<svg width="480" height="280" viewBox="0 0 480 280" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration promoting opening a BankSphere account online">
+  <rect width="480" height="280" rx="20" fill="#0B5FA3" />
+  <ellipse cx="420" cy="30" rx="140" ry="90" fill="#F8FAFC" opacity="0.06" />
+  <ellipse cx="240" cy="140" rx="230" ry="90" fill="none" stroke="#F8FAFC" stroke-width="1.5" opacity="0.15" transform="rotate(-12 240 140)" />
+  <rect x="180" y="90" width="120" height="180" rx="16" fill="#073A66" stroke="#F8FAFC" stroke-width="1.5" opacity="0.9" />
+  <rect x="196" y="112" width="88" height="52" rx="8" fill="#F8FAFC" opacity="0.9" />
+  <path d="M212 138l10 10 20-22" stroke="#0B5FA3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <rect x="196" y="178" width="88" height="8" rx="4" fill="#F8FAFC" opacity="0.5" />
+  <rect x="196" y="194" width="60" height="8" rx="4" fill="#F8FAFC" opacity="0.35" />
+  <circle cx="90" cy="60" r="6" fill="#C9962B" />
+  <circle cx="110" cy="220" r="5" fill="#0E9384" />
+</svg>

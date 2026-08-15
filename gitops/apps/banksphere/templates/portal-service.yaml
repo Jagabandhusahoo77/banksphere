@@ -1,0 +1,19 @@
+{{- $root := . }}
+{{- range $key, $portal := .Values.portals }}
+{{- if $portal.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $portal.repository }}
+  labels:
+    {{- include "banksphere.labels" $root | nindent 4 }}
+    app.kubernetes.io/name: {{ $portal.repository }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ $portal.repository }}
+  ports:
+    - port: {{ $portal.port }}
+      targetPort: {{ $portal.port }}
+---
+{{- end }}
+{{- end }}

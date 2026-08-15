@@ -1,0 +1,21 @@
+{{- if .Values.postgres.enabled }}
+# Same database-per-service init script as
+# infrastructure/docker/*/postgres-init/001-create-databases.sh —
+# generated from .Values.postgres.additionalDatabases so the two never
+# drift apart silently.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  labels:
+    {{- include "banksphere.labels" . | nindent 4 }}
+data:
+  001-create-databases.sh: |
+    #!/bin/sh
+    set -e
+    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+    {{- range .Values.postgres.additionalDatabases }}
+        CREATE DATABASE {{ . }} OWNER "$POSTGRES_USER";
+    {{- end }}
+    EOSQL
+{{- end }}

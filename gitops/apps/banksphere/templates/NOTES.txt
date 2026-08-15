@@ -1,0 +1,15 @@
+BankSphere ({{ .Release.Namespace }}) reconciled by Argo CD.
+
+This chart is not meant to be `helm install`ed by hand in DEV/TEST — Argo
+CD applies it on every Git change to {{ .Chart.Name }}, per the
+Application registered by infrastructure/terraform/modules/k3s. See
+docs/deployment/gitops.md and docs/deployment/helm.md.
+
+Backend services (enabled: {{ range $name, $svc := .Values.services }}{{ if $svc.enabled }}{{ $name }} {{ end }}{{ end }})
+{{- if .Values.ingress.host }}
+API: https://{{ .Values.ingress.host }}
+{{- else }}
+API: no domain configured yet — reach this environment via the ALB's own AWS-assigned DNS name (see `terraform output` in the matching environment).
+{{- end }}
+
+Portals: {{ if or .Values.portals.customerPortal.enabled .Values.portals.employeePortal.enabled }}enabled in-cluster (non-default; see values.yaml){{ else }}served via S3 + CloudFront, not this cluster (see docs/deployment/frontend-hosting.md){{ end }}

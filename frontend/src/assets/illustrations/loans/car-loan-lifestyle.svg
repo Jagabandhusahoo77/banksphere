@@ -1,0 +1,8 @@
+<svg width="200" height="160" viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a car, representing car loans">
+  <rect x="0" y="0" width="200" height="160" rx="18" fill="#E7F1FA" />
+  <path d="M52 100v-18l12-22a10 10 0 0 1 9-5h54a10 10 0 0 1 9 5l12 22v18" stroke="#0B5FA3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="#FFFFFF" />
+  <line x1="52" y1="100" x2="148" y2="100" stroke="#0B5FA3" stroke-width="4" stroke-linecap="round" />
+  <circle cx="72" cy="106" r="9" fill="#0B5FA3" />
+  <circle cx="128" cy="106" r="9" fill="#0B5FA3" />
+  <circle cx="150" cy="48" r="10" fill="#C9962B" opacity="0.4" />
+</svg>

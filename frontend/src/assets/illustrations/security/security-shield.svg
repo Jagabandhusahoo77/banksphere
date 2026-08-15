@@ -1,0 +1,9 @@
+<svg width="480" height="360" viewBox="0 0 480 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a security shield protecting a digital banking session">
+  <rect x="0" y="0" width="480" height="360" rx="24" fill="#073A66" />
+  <ellipse cx="240" cy="180" rx="150" ry="60" fill="none" stroke="#F8FAFC" stroke-width="1.5" opacity="0.25" transform="rotate(-14 240 180)" />
+  <path d="M240 82l72 26v56c0 54-32 88-72 104-40-16-72-50-72-104V108z" fill="#0B5FA3" stroke="#F8FAFC" stroke-width="2" />
+  <path d="M210 178l22 22 40-46" stroke="#F8FAFC" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <circle cx="352" cy="120" r="6" fill="#C9962B" />
+  <circle cx="118" cy="230" r="5" fill="#C9962B" />
+  <circle cx="130" cy="110" r="4" fill="#F8FAFC" opacity="0.5" />
+</svg>

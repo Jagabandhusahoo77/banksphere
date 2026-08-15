@@ -1,0 +1,31 @@
+# TEST overrides layered on top of values.yaml — mirrors values-dev.yaml
+# exactly, with "-test" hostnames. See values-dev.yaml's header comment
+# for what every TODO below actually means and why it's genuinely
+# unknown at this point (no AWS resources created this phase).
+
+image:
+  registry: "" # TODO: fill in after `terraform apply` in environments/test — see values-dev.yaml
+
+ingress:
+  host: "" # TODO: api-test.<domain>, once a domain is configured
+
+services:
+  customer-service:
+    env:
+      CORS_ALLOWED_ORIGINS: "" # TODO: https://app-test.<domain>
+      COOKIE_SECURE: "false" # TODO: "true" once served over HTTPS
+  account-service:
+    env:
+      CORS_ALLOWED_ORIGINS: "" # TODO: https://app-test.<domain>
+  transaction-service:
+    env:
+      CORS_ALLOWED_ORIGINS: "" # TODO: https://app-test.<domain>
+  beneficiary-service:
+    env:
+      CORS_ALLOWED_ORIGINS: "" # TODO: https://app-test.<domain>
+  employee-service:
+    env:
+      EMPLOYEE_PORTAL_CORS_ORIGIN: "" # TODO: https://ops-test.<domain>
+  kyc-service:
+    env:
+      KYC_CORS_ALLOWED_ORIGINS: "" # TODO: https://app-test.<domain>,https://ops-test.<domain>

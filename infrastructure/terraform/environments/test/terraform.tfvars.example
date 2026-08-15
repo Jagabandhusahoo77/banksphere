@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars (git-ignored — see the repo-root .gitignore)
+# and fill in. Nothing in this file is a real value — see
+# infrastructure/README.md for what each of these actually controls.
+
+aws_region = "us-east-1" # REQUIRED — pick your own region; not defaulted anywhere in this codebase
+
+# REQUIRED — typically the same value as DEV's (both read the same
+# gitops/ tree, just values-test.yaml instead of values-dev.yaml).
+gitops_repo_url = ""
+
+# If DEV already registered/manages this domain (route53_zone_id or
+# create_hosted_zone in environments/dev/terraform.tfvars), use the SAME
+# domain_name and route53_zone_id here — do not set create_hosted_zone =
+# true a second time for the same domain.
+domain_name        = ""
+route53_zone_id     = ""
+create_hosted_zone  = false
+
+alert_email = ""
+
+enable_ssh        = false
+admin_cidr_blocks = [] # e.g. ["203.0.113.4/32"] — your own IP, NEVER 0.0.0.0/0

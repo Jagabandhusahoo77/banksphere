@@ -1,0 +1,25 @@
+{{- $root := . }}
+{{- range $name, $svc := .Values.services }}
+{{- if and $svc.enabled $svc.persistence $svc.persistence.enabled }}
+# Single-node demo storage: this PVC is backed by the same EC2 node's
+# root EBS volume via k3s's local-path-provisioner (see
+# postgres-pvc.yaml's identical comment) — not S3. Documents do not
+# survive the node being replaced. See docs/deployment/kyc-storage.md's
+# "Future PROD architecture" section for the S3-backed replacement,
+# deliberately not built this phase.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-data
+  labels:
+    {{- include "banksphere.labels" $root | nindent 4 }}
+    app.kubernetes.io/name: {{ $name }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ $svc.persistence.storageClassName }}
+  resources:
+    requests:
+      storage: {{ $svc.persistence.storage }}
+---
+{{- end }}
+{{- end }}

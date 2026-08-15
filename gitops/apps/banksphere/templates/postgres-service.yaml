@@ -1,0 +1,20 @@
+{{- if .Values.postgres.enabled }}
+# Named "postgres" (not release-prefixed) deliberately — see
+# values.yaml's header comment: DB_HOST=postgres is identical between
+# docker-compose and this chart, and each environment already gets its
+# own namespace (banksphere-dev / banksphere-test), so there is no
+# same-namespace collision risk to prefix against.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    {{- include "banksphere.labels" . | nindent 4 }}
+    app.kubernetes.io/name: postgres
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - port: {{ .Values.postgres.port }}
+      targetPort: {{ .Values.postgres.port }}
+{{- end }}

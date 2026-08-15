@@ -1,0 +1,48 @@
+{{- if .Values.ingress.enabled }}
+# The single internal entry point for api-<env>.<domain> — fans out to
+# the six backend services by the SAME @RequestMapping path prefixes
+# infrastructure/docker/{dev,test}/gateway.nginx.conf used, so nothing
+# about the actual backend routes changed in this rework. Traefik
+# (bundled with k3s, see modules/k3s) is the IngressClass; the ALB
+# forwards plain HTTP to this node's Traefik on modules/alb's
+# target_port, which then does host/path-based routing from here.
+#
+# /actuator/health is routed to customer-service specifically so
+# modules/alb's target group health check (see that module's own
+# comment) has something real, public, and always-up to hit — see
+# docs/deployment/ingress.md.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: banksphere-api
+  labels:
+    {{- include "banksphere.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host }}
+      {{- end }}
+      http:
+        paths:
+          - path: /actuator/health
+            pathType: Exact
+            backend:
+              service:
+                name: customer-service
+                port:
+                  number: {{ (index .Values.services "customer-service").port }}
+          {{- range $name, $svc := .Values.services }}
+          {{- if $svc.enabled }}
+          {{- range $svc.ingressPaths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $name }}
+                port:
+                  number: {{ $svc.port }}
+          {{- end }}
+          {{- end }}
+          {{- end }}
+{{- end }}

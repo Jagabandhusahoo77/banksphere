@@ -1,0 +1,687 @@
+# BankSphere CI/CD pipeline — Phase 10A (k3s + Argo CD GitOps rework).
+#
+# Git -> Build -> Unit tests -> Frontend tests -> Docker build ->
+# Security validation -> Push to ECR -> Update GitOps image tag ->
+# Commit GitOps change -> (Argo CD detects + reconciles DEV on its own
+# polling loop) -> Smoke tests (DEV) -> Promote to TEST (same image,
+# another GitOps commit) -> Smoke tests (TEST) -> Future production
+# approval (no deploy).
+#
+# The single biggest change from this pipeline's previous version:
+# THIS PIPELINE NEVER SSHES OR SSM-EXECS INTO AN EC2 INSTANCE TO DEPLOY
+# THE APPLICATION. It builds images, pushes them to ECR, and writes a
+# Git commit updating gitops/apps/banksphere/values-<env>.yaml's
+# image.tag — Argo CD (already running on each environment's k3s node,
+# registered once by infrastructure/terraform/modules/k3s at node
+# bootstrap) is what actually applies the change, on its own reconcile
+# loop. See docs/deployment/gitops.md.
+#
+# PREREQUISITES this pipeline assumes exist (none of them are created by
+# this file — see infrastructure/README.md's "before you wire up the
+# pipeline" checklist):
+#   - An Azure DevOps "AWS" service connection named by $(awsServiceConnection)
+#     below, scoped to an IAM user/role with exactly the permissions
+#     needed (ECR push only — this pipeline no longer needs
+#     ssm:SendCommand/ec2:DescribeInstances at all, since it never
+#     touches an EC2 instance directly anymore).
+#   - infrastructure/terraform/environments/{dev,test} already applied at
+#     least once (so the k3s nodes, ECR repositories, and Argo CD
+#     Applications this pipeline's changes are picked up by actually
+#     exist).
+#   - Write access back to this same repository (for the GitOps commit
+#     step) — either the pipeline's own default OAuth token (if GitOps
+#     state lives in this repo, as it does this phase — see gitops/README.md)
+#     or a separate PAT/service connection if gitops/ is ever split into
+#     its own repository.
+#
+# Image tag: the git commit SHA ($(Build.SourceVersion)) — never "latest"
+# — matching this phase's own immutable-tag requirement and ECR's
+# repositories being configured with IMAGE_TAG_MUTABILITY=IMMUTABLE (see
+# infrastructure/terraform/modules/ecr), which would reject a re-push of
+# an existing tag outright.
+#
+# Frontend images (customer-portal/employee-portal): a container image
+# is still built and pushed to ECR every run (see
+# infrastructure/terraform/modules/ecr's repository list), built with
+# EMPTY VITE_*_SERVICE_URL build-args — but that image is NOT what
+# DEV/TEST actually serve. It exists solely as a real, pushable artifact
+# for gitops/apps/banksphere's disabled-by-default in-cluster portal
+# Deployments (reference/fallback capability, reached through the same
+# Traefik Ingress as the backend — a genuinely same-origin scenario
+# where empty/relative URLs are correct).
+#
+# The REAL DEV/TEST serving path is S3 + CloudFront (see
+# docs/deployment/frontend-hosting.md), and CloudFront/S3 is a DIFFERENT
+# origin from api-<env>.<domain> — so the static build actually synced
+# to each environment's S3 bucket is built SEPARATELY, inside each
+# DeployFrontendsDev/DeployFrontendsTest stage, with the real
+# api-<env>.<domain> URL baked into VITE_*_SERVICE_URL. This is a
+# deliberate, narrow exception to "build once, promote the same
+# artifact": it applies only to the two frontends' STATIC (non-image)
+# build output, for the structural reason that Vite bakes config in at
+# build time and DEV/TEST are different origins — the six backend
+# Docker images are still built exactly once and promoted unchanged.
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  awsServiceConnection: "banksphere-aws" # create this in Azure DevOps > Project Settings > Service connections before running
+  awsRegion: "$(AWS_REGION)" # set as a pipeline variable (Library) or override per-run — never hard-coded here, see the task's own "region must be configurable" requirement
+  imageTag: "$(Build.SourceVersion)"
+  projectName: "banksphere"
+  gitopsChartPath: "gitops/apps/banksphere"
+
+stages:
+
+  # =====================================================================
+  # STAGE 1 — Build (compile only, no tests yet — see Unit Tests stage)
+  # =====================================================================
+  - stage: Build
+    displayName: "Build"
+    jobs:
+      - job: BackendCompile
+        displayName: "Backend — compile"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          matrix:
+            customer_service: { serviceName: "customer-service" }
+            account_service: { serviceName: "account-service" }
+            transaction_service: { serviceName: "transaction-service" }
+            beneficiary_service: { serviceName: "beneficiary-service" }
+            employee_service: { serviceName: "employee-service" }
+            kyc_service: { serviceName: "kyc-service" }
+        steps:
+          - task: JavaToolInstaller@0
+            inputs:
+              versionSpec: "21"
+              jdkArchitectureOption: "x64"
+              jdkSourceOption: "PreInstalled"
+          - task: Maven@4
+            displayName: "mvn compile"
+            inputs:
+              mavenPomFile: "backend/services/$(serviceName)/pom.xml"
+              goals: "compile"
+              options: "-B"
+
+  # =====================================================================
+  # STAGE 2 — Unit tests (backend)
+  # =====================================================================
+  - stage: UnitTests
+    displayName: "Unit tests"
+    dependsOn: Build
+    jobs:
+      - job: BackendTest
+        displayName: "Backend — mvn test"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          matrix:
+            customer_service: { serviceName: "customer-service" }
+            account_service: { serviceName: "account-service" }
+            transaction_service: { serviceName: "transaction-service" }
+            beneficiary_service: { serviceName: "beneficiary-service" }
+            employee_service: { serviceName: "employee-service" }
+            kyc_service: { serviceName: "kyc-service" }
+        steps:
+          - task: JavaToolInstaller@0
+            inputs:
+              versionSpec: "21"
+              jdkArchitectureOption: "x64"
+              jdkSourceOption: "PreInstalled"
+          - task: Maven@4
+            displayName: "mvn test"
+            inputs:
+              mavenPomFile: "backend/services/$(serviceName)/pom.xml"
+              goals: "test"
+              options: "-B"
+              publishJUnitResults: true
+              testResultsFiles: "**/surefire-reports/TEST-*.xml"
+              # No real Postgres in this pipeline environment yet — the two
+              # real-Postgres integration tests (AccountTransferConcurrencyIT/
+              # AccountTransferRollbackIT) are gated behind
+              # PostgresAssumptions.assumeReachable() and skip themselves
+              # gracefully rather than fail (see docs/09-engineering-journal's
+              # Phase 7A entry) — nothing extra to configure here for that.
+
+  # =====================================================================
+  # STAGE 3 — Frontend tests + build
+  # =====================================================================
+  - stage: FrontendTests
+    displayName: "Frontend tests"
+    dependsOn: Build
+    jobs:
+      - job: FrontendTest
+        displayName: "Frontend — test + build"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          matrix:
+            customer_portal: { appDir: "frontend" }
+            employee_portal: { appDir: "employee-portal" }
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: "20.x"
+          - script: npm ci
+            workingDirectory: "$(appDir)"
+            displayName: "npm ci"
+          - script: npm test
+            workingDirectory: "$(appDir)"
+            displayName: "npm test"
+          - script: npm run build
+            workingDirectory: "$(appDir)"
+            displayName: "npm run build (tsc -b && vite build) — fail-fast before the slower Docker build stage repeats this inside the image"
+
+  # =====================================================================
+  # STAGE 4 — Docker build (all 8 images, tagged with the commit SHA)
+  # =====================================================================
+  - stage: DockerBuild
+    displayName: "Docker build"
+    dependsOn:
+      - UnitTests
+      - FrontendTests
+    jobs:
+      - job: BuildBackendImages
+        displayName: "Build backend images"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          matrix:
+            customer_service: { serviceName: "customer-service" }
+            account_service: { serviceName: "account-service" }
+            transaction_service: { serviceName: "transaction-service" }
+            beneficiary_service: { serviceName: "beneficiary-service" }
+            employee_service: { serviceName: "employee-service" }
+            kyc_service: { serviceName: "kyc-service" }
+        steps:
+          - script: |
+              docker build -t "$(projectName)/$(serviceName):$(imageTag)" backend/services/$(serviceName)
+              docker save "$(projectName)/$(serviceName):$(imageTag)" -o "$(Build.ArtifactStagingDirectory)/$(serviceName).tar"
+            displayName: "docker build $(serviceName)"
+          - publish: "$(Build.ArtifactStagingDirectory)/$(serviceName).tar"
+            artifact: "image-$(serviceName)"
+
+      - job: BuildFrontendImages
+        displayName: "Build frontend images (reference-only ECR artifact — NOT what DEV/TEST actually serve)"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          matrix:
+            customer_portal:
+              appDir: "frontend"
+              imageName: "customer-portal"
+            employee_portal:
+              appDir: "employee-portal"
+              imageName: "employee-portal"
+        steps:
+          # Every VITE_*_SERVICE_URL build-arg is left EMPTY on purpose —
+          # this image is ONLY for gitops/apps/banksphere's disabled-by-
+          # default in-cluster portal Deployments (see values.yaml's
+          # "reference/fallback only" comment), where the portal is
+          # reached through the SAME Traefik Ingress as the backend, so
+          # a relative/same-origin API call is genuinely correct there.
+          # This is NOT the image/artifact that ends up on
+          # app-<env>.<domain>/ops-<env>.<domain> — see the real static
+          # build in DeployFrontendsDev/DeployFrontendsTest below, which
+          # bakes in the real cross-origin api-<env>.<domain> URL instead
+          # (S3+CloudFront is a different origin from the ALB — a
+          # relative URL there would silently resolve against
+          # app-<env>.<domain> itself and 404/rewrite to index.html, not
+          # reach the API — see docs/deployment/networking.md and
+          # docs/deployment/frontend-hosting.md for why these are NOT
+          # interchangeable, unlike the pre-rework single-ALB design
+          # where they were).
+          - script: |
+              docker build \
+                --build-arg VITE_CUSTOMER_SERVICE_URL="" \
+                --build-arg VITE_ACCOUNT_SERVICE_URL="" \
+                --build-arg VITE_TRANSACTION_SERVICE_URL="" \
+                --build-arg VITE_BENEFICIARY_SERVICE_URL="" \
+                --build-arg VITE_KYC_SERVICE_URL="" \
+                --build-arg VITE_EMPLOYEE_SERVICE_URL="" \
+                -t "$(projectName)/$(imageName):$(imageTag)" "$(appDir)"
+              docker save "$(projectName)/$(imageName):$(imageTag)" -o "$(Build.ArtifactStagingDirectory)/$(imageName).tar"
+            displayName: "docker build $(imageName)"
+          - publish: "$(Build.ArtifactStagingDirectory)/$(imageName).tar"
+            artifact: "image-$(imageName)"
+
+  # =====================================================================
+  # STAGE 5 — Security validation
+  # =====================================================================
+  - stage: SecurityValidation
+    displayName: "Security validation"
+    dependsOn: DockerBuild
+    jobs:
+      - job: ScanImages
+        displayName: "Scan images + IaC"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          matrix:
+            customer_service: { imageName: "customer-service" }
+            account_service: { imageName: "account-service" }
+            transaction_service: { imageName: "transaction-service" }
+            beneficiary_service: { imageName: "beneficiary-service" }
+            employee_service: { imageName: "employee-service" }
+            kyc_service: { imageName: "kyc-service" }
+            customer_portal: { imageName: "customer-portal" }
+            employee_portal: { imageName: "employee-portal" }
+        steps:
+          - download: current
+            artifact: "image-$(imageName)"
+          - script: docker load -i "$(Pipeline.Workspace)/image-$(imageName)/$(imageName).tar"
+            displayName: "Load image"
+          - script: |
+              # Trivy (Aqua Security) — open-source, no external account
+              # needed. Fails the build on HIGH/CRITICAL findings. This is
+              # in ADDITION to ECR's own scan-on-push (see
+              # infrastructure/terraform/modules/ecr) — catching a problem
+              # here, before push, is strictly earlier/cheaper than
+              # catching it after.
+              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+              trivy image --severity HIGH,CRITICAL --exit-code 1 "$(projectName)/$(imageName):$(imageTag)"
+            displayName: "Trivy scan — $(imageName)"
+      - job: ValidateTerraform
+        displayName: "terraform fmt/validate (IaC hygiene, no AWS credentials required)"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              curl -fsSL https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip -o tf.zip
+              unzip -q tf.zip && sudo mv terraform /usr/local/bin/
+            displayName: "Install Terraform"
+          - script: |
+              set -e
+              for env in dev test; do
+                echo "== $env =="
+                cd infrastructure/terraform/environments/$env
+                terraform fmt -check -recursive
+                terraform init -backend=false -input=false
+                terraform validate
+                cd -
+              done
+            displayName: "terraform fmt -check / validate (dev, test)"
+      - job: ValidateHelm
+        displayName: "helm lint / template / kubeconform (chart hygiene, no cluster credentials required)"
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              curl -fsSL https://get.helm.sh/helm-v3.21.4-linux-amd64.tar.gz -o helm.tar.gz
+              tar -xzf helm.tar.gz && sudo mv linux-amd64/helm /usr/local/bin/
+              curl -fsSL -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+              tar -xzf kubeconform.tar.gz && sudo mv kubeconform /usr/local/bin/
+            displayName: "Install helm + kubeconform"
+          - script: |
+              set -e
+              cd $(gitopsChartPath)
+              for env in dev test; do
+                echo "== $env =="
+                helm lint . -f values-$env.yaml
+                helm template banksphere-$env . -f values-$env.yaml --namespace banksphere-$env \
+                  --set image.registry=placeholder.dkr.ecr.$(awsRegion).amazonaws.com --set image.tag=$(imageTag) \
+                  > /tmp/rendered-$env.yaml
+                kubeconform -summary -ignore-missing-schemas /tmp/rendered-$env.yaml
+              done
+            displayName: "helm lint / template / kubeconform (dev, test)"
+
+  # =====================================================================
+  # STAGE 6 — Push to ECR
+  # =====================================================================
+  - stage: PushToEcr
+    displayName: "Push to ECR"
+    dependsOn: SecurityValidation
+    jobs:
+      - job: Push
+        displayName: "Push all images"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          matrix:
+            customer_service: { imageName: "customer-service" }
+            account_service: { imageName: "account-service" }
+            transaction_service: { imageName: "transaction-service" }
+            beneficiary_service: { imageName: "beneficiary-service" }
+            employee_service: { imageName: "employee-service" }
+            kyc_service: { imageName: "kyc-service" }
+            customer_portal: { imageName: "customer-portal" }
+            employee_portal: { imageName: "employee-portal" }
+        steps:
+          - download: current
+            artifact: "image-$(imageName)"
+          - script: docker load -i "$(Pipeline.Workspace)/image-$(imageName)/$(imageName).tar"
+            displayName: "Load image"
+          - task: ECRPushImage@1
+            displayName: "Push $(imageName) to ECR"
+            inputs:
+              awsCredentials: "$(awsServiceConnection)"
+              regionName: "$(awsRegion)"
+              imageSource: "imagename"
+              sourceImageName: "$(projectName)/$(imageName)"
+              sourceImageTag: "$(imageTag)"
+              repositoryName: "$(projectName)/$(imageName)"
+              pushTag: "$(imageTag)"
+              # Never pushes/overwrites "latest" — this task only ever
+              # pushes the commit-SHA tag. ECR's repositories are also
+              # IMAGE_TAG_MUTABILITY=IMMUTABLE, so re-pushing an existing
+              # tag is rejected by AWS itself as a second line of defense.
+
+  # =====================================================================
+  # STAGE 7 — Update GitOps image tag for DEV (commit, do NOT deploy
+  # directly) — Argo CD picks this up on its own reconcile loop.
+  # =====================================================================
+  - stage: UpdateGitOpsDev
+    displayName: "Update GitOps image tag (DEV)"
+    dependsOn: PushToEcr
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: UpdateGitOpsDev
+        displayName: "Commit image.tag=$(imageTag) to values-dev.yaml"
+        environment: "banksphere-dev" # Azure DevOps Environment — configure approvals/checks here if desired; DEV itself has none per this phase's instructions
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  persistCredentials: true
+                - script: |
+                    set -euo pipefail
+                    cd "$(Build.SourcesDirectory)"
+                    # yq (not sed) — a targeted, YAML-structure-aware edit
+                    # of exactly one key, so nothing else in the file
+                    # (comments, the TODO placeholders, formatting) is
+                    # touched.
+                    curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+                    chmod +x /usr/local/bin/yq
+                    yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-dev.yaml
+                    git config user.name "banksphere-ci"
+                    git config user.email "ci@banksphere.invalid"
+                    git add $(gitopsChartPath)/values-dev.yaml
+                    git commit -m "ci: deploy $(imageTag) to DEV [skip ci]"
+                    git push origin HEAD:main
+                  displayName: "yq set image.tag + git commit + push"
+
+  # =====================================================================
+  # STAGE 8 — Smoke tests (DEV) — waits for Argo CD's own reconcile loop
+  # (default poll interval: 3 minutes) before checking, since this
+  # pipeline no longer knows synchronously when the deploy actually lands.
+  # =====================================================================
+  - stage: SmokeTestDev
+    displayName: "Smoke tests (DEV)"
+    dependsOn: UpdateGitOpsDev
+    jobs:
+      - job: SmokeDev
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              echo "Waiting for Argo CD's reconcile loop to pick up the new commit (default poll: 3 min)"
+              sleep 240
+            displayName: "Wait for Argo CD reconcile"
+          - script: |
+              set -e
+              BASE="https://api-dev.$(DOMAIN_NAME)"
+              # Falls back to the ALB's own DNS name if DOMAIN_NAME isn't
+              # set yet (see docs/deployment/dns-and-https.md) — pass
+              # ALB_DNS_NAME_DEV as a pipeline variable (from `terraform
+              # output alb_dns_name` in the dev environment) for this
+              # fallback to work.
+              if [ -z "$(DOMAIN_NAME)" ]; then BASE="http://$(ALB_DNS_NAME_DEV)"; fi
+              echo "Smoke-testing $BASE"
+              curl -sf "$BASE/actuator/health"
+              curl -sf -X POST "$BASE/api/v1/auth/otp/request" \
+                -H "Content-Type: application/json" \
+                -d '{"identifier":"smoke-test@example.com"}'
+            displayName: "Health + a real, side-effect-free API call (generic OTP-request response — never reveals whether the identifier exists, safe to call blind)"
+
+  # =====================================================================
+  # STAGE 9 — Deploy frontends (DEV) — S3 sync + CloudFront invalidation,
+  # NOT Argo CD/Kubernetes (see this file's header comment).
+  # =====================================================================
+  - stage: DeployFrontendsDev
+    displayName: "Deploy frontends (DEV) — S3 + CloudFront"
+    dependsOn: SmokeTestDev
+    jobs:
+      - deployment: DeployFrontendsDev
+        displayName: "Build with real DEV API URL, sync dist/ to S3, invalidate CloudFront"
+        environment: "banksphere-dev"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Built HERE, per environment, with the REAL api-dev
+                # origin baked in — not the empty/relative build-args
+                # used for the reference-only Docker image above. This
+                # is a deliberate exception to "build once, promote the
+                # same artifact" for the two frontends specifically:
+                # Vite bakes config in at build time, DEV and TEST are
+                # different origins (api-dev vs api-test), and there is
+                # no runtime env-injection mechanism for a static S3
+                # site — so DEV and TEST genuinely need two different
+                # static builds, unlike the six backend Docker images
+                # (which are still built exactly once and promoted
+                # unchanged). See docs/deployment/frontend-hosting.md.
+                - task: NodeTool@0
+                  inputs:
+                    versionSpec: "20.x"
+                - script: |
+                    set -euo pipefail
+                    API_BASE="https://api-dev.$(DOMAIN_NAME)"
+                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_DEV)"; fi
+                    npm ci
+                    VITE_CUSTOMER_SERVICE_URL="$API_BASE" \
+                    VITE_ACCOUNT_SERVICE_URL="$API_BASE" \
+                    VITE_TRANSACTION_SERVICE_URL="$API_BASE" \
+                    VITE_BENEFICIARY_SERVICE_URL="$API_BASE" \
+                    VITE_KYC_SERVICE_URL="$API_BASE" \
+                      npm run build
+                  workingDirectory: "frontend"
+                  displayName: "npm run build (customer-portal, DEV API URL)"
+                - task: NodeTool@0
+                  inputs:
+                    versionSpec: "20.x"
+                - script: |
+                    set -euo pipefail
+                    API_BASE="https://api-dev.$(DOMAIN_NAME)"
+                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_DEV)"; fi
+                    npm ci
+                    VITE_EMPLOYEE_SERVICE_URL="$API_BASE" \
+                    VITE_KYC_SERVICE_URL="$API_BASE" \
+                      npm run build
+                  workingDirectory: "employee-portal"
+                  displayName: "npm run build (employee-portal, DEV API URL)"
+                - task: S3Upload@1
+                  displayName: "Sync customer-portal dist/ to S3 (DEV)"
+                  inputs:
+                    awsCredentials: "$(awsServiceConnection)"
+                    regionName: "$(awsRegion)"
+                    bucketName: "$(S3_BUCKET_CUSTOMER_PORTAL_DEV)" # `terraform output s3_bucket_ids` in environments/dev
+                    sourceFolder: "$(Build.SourcesDirectory)/frontend/dist"
+                    globExpressions: "**"
+                    createBucket: false
+                - task: S3Upload@1
+                  displayName: "Sync employee-portal dist/ to S3 (DEV)"
+                  inputs:
+                    awsCredentials: "$(awsServiceConnection)"
+                    regionName: "$(awsRegion)"
+                    bucketName: "$(S3_BUCKET_EMPLOYEE_PORTAL_DEV)"
+                    sourceFolder: "$(Build.SourcesDirectory)/employee-portal/dist"
+                    globExpressions: "**"
+                    createBucket: false
+                - task: AWSShellScript@1
+                  displayName: "Invalidate CloudFront caches (DEV)"
+                  inputs:
+                    awsCredentials: "$(awsServiceConnection)"
+                    regionName: "$(awsRegion)"
+                    scriptType: "inline"
+                    inlineScript: |
+                      set -euo pipefail
+                      aws cloudfront create-invalidation --distribution-id "$(CLOUDFRONT_DIST_ID_APP_DEV)" --paths "/*"
+                      aws cloudfront create-invalidation --distribution-id "$(CLOUDFRONT_DIST_ID_OPS_DEV)" --paths "/*"
+
+  # =====================================================================
+  # STAGE 10 — Update GitOps image tag for TEST (promotion — same image,
+  # a new GitOps commit, never a rebuild).
+  # =====================================================================
+  - stage: UpdateGitOpsTest
+    displayName: "Update GitOps image tag (TEST)"
+    dependsOn: DeployFrontendsDev
+    jobs:
+      - deployment: UpdateGitOpsTest
+        displayName: "Commit image.tag=$(imageTag) to values-test.yaml"
+        environment: "banksphere-test" # configure a required approval here if you want a human gate before TEST, unlike DEV
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  persistCredentials: true
+                - script: |
+                    set -euo pipefail
+                    cd "$(Build.SourcesDirectory)"
+                    curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+                    chmod +x /usr/local/bin/yq
+                    yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-test.yaml
+                    git config user.name "banksphere-ci"
+                    git config user.email "ci@banksphere.invalid"
+                    git add $(gitopsChartPath)/values-test.yaml
+                    git commit -m "ci: promote $(imageTag) to TEST [skip ci]"
+                    git push origin HEAD:main
+                  displayName: "yq set image.tag + git commit + push"
+
+  # =====================================================================
+  # STAGE 11 — Smoke tests (TEST)
+  # =====================================================================
+  - stage: SmokeTestTest
+    displayName: "Smoke tests (TEST)"
+    dependsOn: UpdateGitOpsTest
+    jobs:
+      - job: SmokeTest
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              echo "Waiting for Argo CD's reconcile loop to pick up the new commit (default poll: 3 min)"
+              sleep 240
+            displayName: "Wait for Argo CD reconcile"
+          - script: |
+              set -e
+              BASE="https://api-test.$(DOMAIN_NAME)"
+              if [ -z "$(DOMAIN_NAME)" ]; then BASE="http://$(ALB_DNS_NAME_TEST)"; fi
+              echo "Smoke-testing $BASE"
+              curl -sf "$BASE/actuator/health"
+              curl -sf -X POST "$BASE/api/v1/auth/otp/request" \
+                -H "Content-Type: application/json" \
+                -d '{"identifier":"smoke-test@example.com"}'
+            displayName: "Health + a real, side-effect-free API call"
+
+  # =====================================================================
+  # STAGE 12 — Deploy frontends (TEST) — same S3 + CloudFront pattern
+  # =====================================================================
+  - stage: DeployFrontendsTest
+    displayName: "Deploy frontends (TEST) — S3 + CloudFront"
+    dependsOn: SmokeTestTest
+    jobs:
+      - deployment: DeployFrontendsTest
+        displayName: "Build with real TEST API URL, sync dist/ to S3, invalidate CloudFront"
+        environment: "banksphere-test"
+        pool:
+          vmImage: "ubuntu-latest"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # See DeployFrontendsDev's identical comment — TEST gets
+                # its own build (api-test origin), not the DEV artifact
+                # re-synced, for the same "Vite bakes config at build
+                # time, two different origins" reason.
+                - task: NodeTool@0
+                  inputs:
+                    versionSpec: "20.x"
+                - script: |
+                    set -euo pipefail
+                    API_BASE="https://api-test.$(DOMAIN_NAME)"
+                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_TEST)"; fi
+                    npm ci
+                    VITE_CUSTOMER_SERVICE_URL="$API_BASE" \
+                    VITE_ACCOUNT_SERVICE_URL="$API_BASE" \
+                    VITE_TRANSACTION_SERVICE_URL="$API_BASE" \
+                    VITE_BENEFICIARY_SERVICE_URL="$API_BASE" \
+                    VITE_KYC_SERVICE_URL="$API_BASE" \
+                      npm run build
+                  workingDirectory: "frontend"
+                  displayName: "npm run build (customer-portal, TEST API URL)"
+                - task: NodeTool@0
+                  inputs:
+                    versionSpec: "20.x"
+                - script: |
+                    set -euo pipefail
+                    API_BASE="https://api-test.$(DOMAIN_NAME)"
+                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_TEST)"; fi
+                    npm ci
+                    VITE_EMPLOYEE_SERVICE_URL="$API_BASE" \
+                    VITE_KYC_SERVICE_URL="$API_BASE" \
+                      npm run build
+                  workingDirectory: "employee-portal"
+                  displayName: "npm run build (employee-portal, TEST API URL)"
+                - task: S3Upload@1
+                  displayName: "Sync customer-portal dist/ to S3 (TEST)"
+                  inputs:
+                    awsCredentials: "$(awsServiceConnection)"
+                    regionName: "$(awsRegion)"
+                    bucketName: "$(S3_BUCKET_CUSTOMER_PORTAL_TEST)"
+                    sourceFolder: "$(Build.SourcesDirectory)/frontend/dist"
+                    globExpressions: "**"
+                    createBucket: false
+                - task: S3Upload@1
+                  displayName: "Sync employee-portal dist/ to S3 (TEST)"
+                  inputs:
+                    awsCredentials: "$(awsServiceConnection)"
+                    regionName: "$(awsRegion)"
+                    bucketName: "$(S3_BUCKET_EMPLOYEE_PORTAL_TEST)"
+                    sourceFolder: "$(Build.SourcesDirectory)/employee-portal/dist"
+                    globExpressions: "**"
+                    createBucket: false
+                - task: AWSShellScript@1
+                  displayName: "Invalidate CloudFront caches (TEST)"
+                  inputs:
+                    awsCredentials: "$(awsServiceConnection)"
+                    regionName: "$(awsRegion)"
+                    scriptType: "inline"
+                    inlineScript: |
+                      set -euo pipefail
+                      aws cloudfront create-invalidation --distribution-id "$(CLOUDFRONT_DIST_ID_APP_TEST)" --paths "/*"
+                      aws cloudfront create-invalidation --distribution-id "$(CLOUDFRONT_DIST_ID_OPS_TEST)" --paths "/*"
+
+  # =====================================================================
+  # STAGE 13 — Future production approval (NO DEPLOY — see
+  # infrastructure/terraform/environments/prod/README.md and
+  # gitops/environments/prod/README.md)
+  # =====================================================================
+  - stage: FutureProductionApproval
+    displayName: "Future production approval (not implemented)"
+    dependsOn: DeployFrontendsTest
+    jobs:
+      - job: NotImplemented
+        pool:
+          vmImage: "ubuntu-latest"
+        steps:
+          - script: |
+              echo "PROD is not implemented in this phase — see infrastructure/terraform/environments/prod/README.md and gitops/environments/prod/README.md."
+              echo "This stage exists as a placeholder for a future manual-approval gate + EKS deployment + a values-prod.yaml/prod Argo CD Application, deliberately not built yet."
+            displayName: "No-op — PROD deployment is out of scope for Phase 10A"

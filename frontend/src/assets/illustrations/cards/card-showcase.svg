@@ -1,0 +1,19 @@
+<svg width="480" height="360" viewBox="0 0 480 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a BankSphere debit card">
+  <rect x="0" y="0" width="480" height="360" rx="24" fill="#F8EEDA" />
+  <rect x="120" y="150" width="240" height="10" rx="5" fill="#0B5FA3" opacity="0.12" />
+  <g transform="rotate(-8 240 180)">
+    <rect x="120" y="120" width="240" height="150" rx="16" fill="#0B5FA3" />
+    <rect x="120" y="120" width="240" height="150" rx="16" fill="url(#card-gradient)" />
+    <rect x="144" y="150" width="34" height="24" rx="4" fill="#C9962B" />
+    <rect x="144" y="210" width="120" height="10" rx="5" fill="#F8FAFC" opacity="0.85" />
+    <rect x="144" y="228" width="80" height="8" rx="4" fill="#F8FAFC" opacity="0.6" />
+    <circle cx="322" cy="240" r="14" fill="#F8FAFC" opacity="0.25" />
+    <circle cx="336" cy="240" r="14" fill="#C9962B" opacity="0.55" />
+  </g>
+  <defs>
+    <linearGradient id="card-gradient" x1="120" y1="120" x2="360" y2="270" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0B5FA3" />
+      <stop offset="1" stop-color="#073A66" />
+    </linearGradient>
+  </defs>
+</svg>

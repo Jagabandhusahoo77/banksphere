@@ -1,0 +1,15 @@
+<svg width="220" height="56" viewBox="0 0 220 56" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="banksphere-logo-white-title">
+  <title id="banksphere-logo-white-title">BankSphere</title>
+
+  <!-- Monochrome reversed mark for dark/colored backgrounds (header,
+       footer, hero). Same geometry as banksphere-logo.svg, rendered in a
+       single ink color plus the brand accent dot. -->
+  <rect x="0" y="0" width="56" height="56" rx="14" fill="none" stroke="#F8FAFC" stroke-width="2" opacity="0.9" />
+  <circle cx="28" cy="28" r="13" fill="none" stroke="#F8FAFC" stroke-width="3" />
+  <ellipse cx="28" cy="28" rx="21" ry="8" fill="none" stroke="#F8FAFC" stroke-width="2.25" opacity="0.9" transform="rotate(-20 28 28)" />
+  <circle cx="46.2" cy="19.8" r="3.4" fill="#C9962B" />
+
+  <text x="68" y="36" font-family="-apple-system, 'Segoe UI', Roboto, Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="-0.02em" fill="#F8FAFC">
+    BankSphere
+  </text>
+</svg>

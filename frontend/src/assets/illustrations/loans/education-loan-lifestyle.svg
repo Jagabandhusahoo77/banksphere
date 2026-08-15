@@ -1,0 +1,7 @@
+<svg width="200" height="160" viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a graduation cap and book, representing education loans">
+  <rect x="0" y="0" width="200" height="160" rx="18" fill="#E7F1FA" />
+  <path d="M42 78l58-24 58 24-58 24z" fill="#0E9384" />
+  <path d="M64 88v22c0 8 14 14 36 14s36-6 36-14V88" stroke="#0E9384" stroke-width="4" fill="none" />
+  <line x1="150" y1="78" x2="150" y2="102" stroke="#0E9384" stroke-width="4" stroke-linecap="round" />
+  <circle cx="60" cy="46" r="9" fill="#C9962B" opacity="0.5" />
+</svg>

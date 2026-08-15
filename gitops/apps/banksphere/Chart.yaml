@@ -1,0 +1,13 @@
+apiVersion: v2
+name: banksphere
+description: >-
+  BankSphere's six backend services, Postgres, and (disabled by default)
+  a reference-only copy of the two frontend portals, deployed to a
+  single-node k3s cluster by Argo CD. See docs/deployment/helm.md and
+  docs/deployment/gitops.md — this chart is never `helm install`ed by a
+  human; Argo CD's Application (registered once by
+  infrastructure/terraform/modules/k3s at node bootstrap) renders and
+  applies it on every reconcile.
+type: application
+version: 0.1.0
+appVersion: "unset"
