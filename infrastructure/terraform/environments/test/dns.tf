@@ -23,13 +23,18 @@ module "dns" {
 
   zone_id = local.effective_zone_id
 
-  api_fqdn     = local.api_fqdn
+  api_fqdn                   = local.api_fqdn
+  api_gateway_domain_name    = module.api_gateway.domain_target_domain_name
+  api_gateway_hosted_zone_id = module.api_gateway.domain_hosted_zone_id
+
+  app_fqdn     = local.app_fqdn
   alb_dns_name = module.alb.dns_name
   alb_zone_id  = module.alb.zone_id
 
-  app_fqdn                   = local.app_fqdn
-  app_cloudfront_domain_name = module.cloudfront.distribution_domain_names["customer-portal"]
-
-  ops_fqdn                   = local.ops_fqdn
-  ops_cloudfront_domain_name = module.cloudfront.distribution_domain_names["employee-portal"]
+  # ops_fqdn (employee-portal) is intentionally NOT wired to anything
+  # here — CloudFront (its previous target) was removed, and the target
+  # architecture this environment now implements doesn't specify where
+  # the employee portal should be served from. This is a genuine open
+  # decision, not a silent removal — see the architecture-change
+  # report's own callout.
 }

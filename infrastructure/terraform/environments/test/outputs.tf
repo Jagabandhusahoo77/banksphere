@@ -1,5 +1,5 @@
 output "alb_dns_name" {
-  description = "ALB's own AWS-generated DNS name — the api-test ingress path, reachable immediately after apply even before a domain is configured (over HTTP)."
+  description = "The PUBLIC ALB's own AWS-generated DNS name — the frontend entry point, reachable immediately after apply even before a domain is configured (over HTTP). Backend/API traffic goes through API Gateway now, not this ALB — see api_gateway_endpoint."
   value       = module.alb.dns_name
 }
 
@@ -31,17 +31,14 @@ output "hosted_zone_name_servers" {
   value       = length(aws_route53_zone.this) > 0 ? aws_route53_zone.this[0].name_servers : []
 }
 
-output "cloudfront_domain_names" {
-  value = module.cloudfront.distribution_domain_names
+output "alb_private_dns_name" {
+  description = "The private ALB's own AWS-generated DNS name. Not internet-reachable — for reference/troubleshooting only (e.g. confirming its listener from inside the VPC)."
+  value       = module.alb_private.dns_name
 }
 
-output "cloudfront_distribution_ids" {
-  description = "Feed these into the pipeline's CLOUDFRONT_DIST_ID_APP_TEST/CLOUDFRONT_DIST_ID_OPS_TEST variables — azure-pipelines.yml's frontend deploy stage invalidates by distribution id, not domain name."
-  value       = module.cloudfront.distribution_ids
-}
-
-output "s3_bucket_ids" {
-  value = module.s3.bucket_ids
+output "api_gateway_endpoint" {
+  description = "API Gateway's own default endpoint — reachable immediately, even before a domain is configured. This is the real way to reach the backend now, not the ALB directly."
+  value       = module.api_gateway.api_endpoint
 }
 
 output "cloudwatch_dashboard_name" {

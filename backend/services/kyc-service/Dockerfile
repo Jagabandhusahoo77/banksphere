@@ -9,7 +9,7 @@ COPY src ./src
 RUN mvn -B -q package -DskipTests
 
 # --- Run stage ---
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21.0.12_8-jre-alpine-3.24
 WORKDIR /app
 
 RUN addgroup -S banksphere && adduser -S banksphere -G banksphere
