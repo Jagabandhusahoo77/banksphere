@@ -10,8 +10,21 @@ variable "vpc_id" {
   type = string
 }
 
-variable "public_subnet_ids" {
-  type = list(string)
+variable "subnet_ids" {
+  description = "Subnets for this ALB's own load-balancer nodes — public subnets for the internet-facing instantiation, private subnets for the internal one. At least 2, in different AZs."
+  type        = list(string)
+}
+
+variable "internal" {
+  description = "false = internet-facing (the public ALB). true = internal-only, no public IP, no route from the internet (the private ALB, reached only via the API Gateway VPC Link). See modules/security's alb vs. alb_private security groups, which enforce the actual traffic restriction regardless of this setting."
+  type        = bool
+  default     = false
+}
+
+variable "name_suffix" {
+  description = "Appended to this ALB's and its target group's name, to disambiguate the two instantiations (e.g. \"-private\") without renaming/replacing the original public ALB, which has no suffix (empty string, the default) for backward compatibility with what's already been applied."
+  type        = string
+  default     = ""
 }
 
 variable "security_group_id" {

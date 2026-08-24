@@ -170,7 +170,23 @@ stages:
         steps:
           - task: NodeTool@0
             inputs:
-              versionSpec: "20.x"
+              # A floating minor ("24.x") always resolves to the latest
+              # available 24.x release, never an old 24.0.x one — jsdom
+              # 30.x requires Node ^22.22.2 || ^24.15.0 || >=26.0.0, so an
+              # early 24.x release wouldn't actually satisfy it either.
+              versionSpec: "24.x"
+          - script: |
+              set -euo pipefail
+              echo "node --version:" && node --version
+              echo "npm --version:"  && npm --version
+              echo "which node:"     && which node
+              echo "which npm:"      && which npm
+              # Fails the build loudly if NodeTool@0 didn't actually put a
+              # 24.x node first on PATH — do not trust the task's own
+              # "installed" log line, verify the binary that will actually
+              # run npm ci gets used.
+              node --version | grep -qE '^v24\.' || { echo "##[error]Expected Node 24.x, got $(node --version)"; exit 1; }
+            displayName: "Verify Node 24.x is actually on PATH"
           - script: npm ci
             workingDirectory: "$(appDir)"
             displayName: "npm ci"
@@ -476,9 +492,11 @@ stages:
                 # unchanged). See docs/deployment/frontend-hosting.md.
                 - task: NodeTool@0
                   inputs:
-                    versionSpec: "20.x"
+                    versionSpec: "24.x" # see FrontendTests stage's own comment on why a floating 24.x, not a pinned old release
                 - script: |
                     set -euo pipefail
+                    node --version | grep -qE '^v24\.' || { echo "##[error]Expected Node 24.x, got $(node --version)"; exit 1; }
+                    echo "node: $(node --version), npm: $(npm --version), $(which node), $(which npm)"
                     API_BASE="https://api-dev.$(DOMAIN_NAME)"
                     if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_DEV)"; fi
                     npm ci
@@ -492,9 +510,11 @@ stages:
                   displayName: "npm run build (customer-portal, DEV API URL)"
                 - task: NodeTool@0
                   inputs:
-                    versionSpec: "20.x"
+                    versionSpec: "24.x"
                 - script: |
                     set -euo pipefail
+                    node --version | grep -qE '^v24\.' || { echo "##[error]Expected Node 24.x, got $(node --version)"; exit 1; }
+                    echo "node: $(node --version), npm: $(npm --version), $(which node), $(which npm)"
                     API_BASE="https://api-dev.$(DOMAIN_NAME)"
                     if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_DEV)"; fi
                     npm ci
@@ -612,9 +632,11 @@ stages:
                 # time, two different origins" reason.
                 - task: NodeTool@0
                   inputs:
-                    versionSpec: "20.x"
+                    versionSpec: "24.x"
                 - script: |
                     set -euo pipefail
+                    node --version | grep -qE '^v24\.' || { echo "##[error]Expected Node 24.x, got $(node --version)"; exit 1; }
+                    echo "node: $(node --version), npm: $(npm --version), $(which node), $(which npm)"
                     API_BASE="https://api-test.$(DOMAIN_NAME)"
                     if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_TEST)"; fi
                     npm ci
@@ -628,9 +650,11 @@ stages:
                   displayName: "npm run build (customer-portal, TEST API URL)"
                 - task: NodeTool@0
                   inputs:
-                    versionSpec: "20.x"
+                    versionSpec: "24.x"
                 - script: |
                     set -euo pipefail
+                    node --version | grep -qE '^v24\.' || { echo "##[error]Expected Node 24.x, got $(node --version)"; exit 1; }
+                    echo "node: $(node --version), npm: $(npm --version), $(which node), $(which npm)"
                     API_BASE="https://api-test.$(DOMAIN_NAME)"
                     if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_TEST)"; fi
                     npm ci

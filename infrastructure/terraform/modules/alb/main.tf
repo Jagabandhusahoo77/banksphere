@@ -1,22 +1,29 @@
-# A single ALB whose only job is: terminate the ACM certificate for
-# api-<env>.<domain> and forward plain HTTP to the k3s node's Traefik
-# ingress controller, which then does the REAL routing (by Host header,
-# to the right Kubernetes Service) using the Ingress resources the Helm
-# chart creates — see gitops/apps/banksphere/templates/ingress.yaml and
-# docs/deployment/ingress.md.
+# A generic ALB module, instantiated TWICE by the environment root (see
+# environments/dev/alb.tf):
+#   - PUBLIC (internal=false, in public subnets): the only internet-
+#     facing load balancer, forwards to the k3s node's Traefik ingress,
+#     which routes to the frontend Kubernetes Service.
+#   - PRIVATE (internal=true, in private subnets): never internet-facing,
+#     receives traffic only from the API Gateway VPC Link (see
+#     modules/api_gateway and modules/security's alb_private/vpc_link
+#     security groups), also forwards to Traefik — which routes THIS
+#     traffic to the backend Kubernetes Services via the SAME existing
+#     Ingress path-prefix rules the public path already used. See
+#     docs/deployment/ingress.md.
 #
-# app-<env>.<domain>/ops-<env>.<domain> do NOT go through this ALB at all
-# — they're served by CloudFront (see modules/cloudfront) pointed
-# directly at S3. This ALB exists purely for the Kubernetes API traffic
-# path, which is why it needs only ONE target group and no host-header
-# listener rules (there's only one thing it's ever routing to).
+# Both instantiations target the SAME single EC2/k3s node, same port —
+# Traefik (not this module, not two different target groups) is what
+# actually separates frontend vs. backend traffic, by path. This is
+# deliberately the smallest change that reuses the existing ALB->
+# instance-target->Traefik->Ingress mechanism rather than inventing a
+# second one.
 
 resource "aws_lb" "this" {
-  name               = "${var.project_name}-${var.environment}"
-  internal           = false
+  name               = "${var.project_name}-${var.environment}${var.name_suffix}"
+  internal           = var.internal
   load_balancer_type = "application"
   security_groups    = [var.security_group_id]
-  subnets            = var.public_subnet_ids
+  subnets            = var.subnet_ids
 
   enable_deletion_protection = false # a dev/test learning environment should stay easy to tear down
 
@@ -25,13 +32,13 @@ resource "aws_lb" "this" {
 
 locals {
   local_tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-alb"
+    Name = "${var.project_name}-${var.environment}${var.name_suffix}-alb"
   })
   https_enabled = var.certificate_arn != ""
 }
 
 resource "aws_lb_target_group" "ingress" {
-  name        = "${var.project_name}-${var.environment}-ingress"
+  name        = "${var.project_name}-${var.environment}${var.name_suffix}-ingress"
   port        = var.target_port
   protocol    = "HTTP"
   vpc_id      = var.vpc_id

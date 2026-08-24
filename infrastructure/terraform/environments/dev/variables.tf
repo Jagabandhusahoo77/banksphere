@@ -27,6 +27,12 @@ variable "public_subnet_cidrs" {
   default = ["10.20.1.0/24", "10.20.2.0/24"]
 }
 
+variable "private_subnet_cidrs" {
+  description = "For the private ALB + API Gateway VPC Link — see modules/networking's own comment on why no NAT Gateway is needed for these."
+  type        = list(string)
+  default     = ["10.20.11.0/24", "10.20.12.0/24"]
+}
+
 variable "instance_type" {
   type    = string
   default = "t3.medium"

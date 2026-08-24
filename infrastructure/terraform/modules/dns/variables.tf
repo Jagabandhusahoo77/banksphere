@@ -9,14 +9,16 @@ variable "api_fqdn" {
   default = ""
 }
 
-variable "alb_dns_name" {
-  type    = string
-  default = ""
+variable "api_gateway_domain_name" {
+  description = "API Gateway custom domain's own target hostname (module.api_gateway's domain_target_domain_name output) — the api_fqdn ALIAS record's target. Empty string if no domain is configured (API Gateway then has no custom domain to alias to yet)."
+  type        = string
+  default     = ""
 }
 
-variable "alb_zone_id" {
-  type    = string
-  default = ""
+variable "api_gateway_hosted_zone_id" {
+  description = "Companion to api_gateway_domain_name (module.api_gateway's domain_hosted_zone_id output)."
+  type        = string
+  default     = ""
 }
 
 variable "app_fqdn" {
@@ -24,26 +26,13 @@ variable "app_fqdn" {
   default = ""
 }
 
-variable "app_cloudfront_domain_name" {
-  type    = string
-  default = ""
+variable "alb_dns_name" {
+  description = "The PUBLIC ALB's own DNS name — app_fqdn's ALIAS target (the frontend entry point)."
+  type        = string
+  default     = ""
 }
 
-variable "ops_fqdn" {
+variable "alb_zone_id" {
   type    = string
   default = ""
-}
-
-variable "ops_cloudfront_domain_name" {
-  type    = string
-  default = ""
-}
-
-# CloudFront's hosted zone id for ALIAS records is a single, fixed,
-# well-known AWS constant — the same for every CloudFront distribution in
-# every account/region. See
-# https://docs.aws.amazon.com/general/latest/gr/cf_region.html.
-variable "cloudfront_hosted_zone_id" {
-  type    = string
-  default = "Z2FDTNDATAQYW2"
 }

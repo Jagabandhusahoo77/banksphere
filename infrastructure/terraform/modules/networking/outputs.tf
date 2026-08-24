@@ -9,8 +9,13 @@ output "vpc_cidr_block" {
 }
 
 output "public_subnet_ids" {
-  description = "IDs of the public subnets (for ALB + EC2 placement)."
+  description = "IDs of the public subnets (for the public ALB + EC2/k3s node placement)."
   value       = aws_subnet.public[*].id
+}
+
+output "private_subnet_ids" {
+  description = "IDs of the private subnets (for the private/internal ALB + the API Gateway VPC Link)."
+  value       = aws_subnet.private[*].id
 }
 
 output "internet_gateway_id" {

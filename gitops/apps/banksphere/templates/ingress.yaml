@@ -1,15 +1,19 @@
 {{- if .Values.ingress.enabled }}
-# The single internal entry point for api-<env>.<domain> — fans out to
-# the six backend services by the SAME @RequestMapping path prefixes
-# infrastructure/docker/{dev,test}/gateway.nginx.conf used, so nothing
-# about the actual backend routes changed in this rework. Traefik
-# (bundled with k3s, see modules/k3s) is the IngressClass; the ALB
-# forwards plain HTTP to this node's Traefik on modules/alb's
-# target_port, which then does host/path-based routing from here.
+# A single Ingress, reached via TWO different AWS front doors now (see
+# the architecture-change report):
+#   - the PUBLIC ALB (api_ports.ingress_http) forwards frontend traffic
+#     here — the "/" catch-all rule below routes it to customer-portal.
+#   - the PRIVATE ALB, reached only via API Gateway's VPC Link, ALSO
+#     forwards here, on the same port — the backend path-prefix rules
+#     below (unchanged from before this architecture change) route it to
+#     the six backend services. Traefik/this Ingress is what actually
+#     separates the two, by path, not two different Ingress objects or
+#     two different Traefik configs.
 #
 # /actuator/health is routed to customer-service specifically so
 # modules/alb's target group health check (see that module's own
-# comment) has something real, public, and always-up to hit — see
+# comment, on BOTH the public and private ALB instantiations) has
+# something real, public, and always-up to hit — see
 # docs/deployment/ingress.md.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -44,5 +48,20 @@ spec:
                   number: {{ $svc.port }}
           {{- end }}
           {{- end }}
+          {{- end }}
+          {{- if .Values.portals.customerPortal.enabled }}
+          # Catch-all, deliberately LAST and LEAST specific — Kubernetes
+          # Ingress path matching is longest-prefix-first, so every
+          # backend path above (e.g. /api/v1/accounts) always wins over
+          # this "/" rule regardless of declaration order. Only requests
+          # that don't match any backend prefix (i.e. the frontend's own
+          # static assets/routes) fall through to here.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.portals.customerPortal.repository }}
+                port:
+                  number: {{ .Values.portals.customerPortal.port }}
           {{- end }}
 {{- end }}

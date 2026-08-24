@@ -37,9 +37,15 @@ variable "admin_cidr_blocks" {
 }
 
 variable "alb_ingress_cidr_blocks" {
-  description = "CIDR blocks allowed to reach the ALB's public listener(s). Defaults to the whole internet, which is the point of a public-facing load balancer — restrict this if the environment should not actually be internet-reachable (e.g. an internal-only TEST environment)."
+  description = "CIDR blocks allowed to reach the PUBLIC ALB's listener(s). Defaults to the whole internet, which is the point of a public-facing load balancer — restrict this if the environment should not actually be internet-reachable (e.g. an internal-only TEST environment). Never applies to the private ALB, which only ever accepts traffic from the VPC Link security group, never a CIDR block."
   type        = list(string)
   default     = ["0.0.0.0/0"]
+}
+
+variable "private_alb_listener_port" {
+  description = "Port the private ALB listens on and forwards to the EC2 instance — matches the public ALB's own target_port (Traefik's HTTP ingress port), since both ALBs ultimately hit the same k3s node. See modules/api_gateway for the VPC Link integration that reaches this port."
+  type        = number
+  default     = 80
 }
 
 variable "tags" {

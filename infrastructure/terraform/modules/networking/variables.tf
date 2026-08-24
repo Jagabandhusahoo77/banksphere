@@ -23,6 +23,16 @@ variable "public_subnet_cidrs" {
   }
 }
 
+variable "private_subnet_cidrs" {
+  description = "CIDR blocks for the private subnets (minimum 2, in different AZs — required by both the private/internal ALB and the API Gateway VPC Link). No NAT Gateway is created for these — see this module's own comment for why nothing in them needs outbound internet access."
+  type        = list(string)
+
+  validation {
+    condition     = length(var.private_subnet_cidrs) >= 2
+    error_message = "At least 2 private subnet CIDRs are required (the internal ALB and the VPC Link both need subnets in at least 2 Availability Zones)."
+  }
+}
+
 variable "tags" {
   description = "Common tags applied to every resource this module creates."
   type        = map(string)
