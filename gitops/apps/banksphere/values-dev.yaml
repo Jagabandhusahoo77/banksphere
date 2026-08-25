@@ -19,14 +19,12 @@
 
 image:
   registry: "" # TODO: fill in after `terraform apply` in environments/dev — see header comment
-
+  tag: e9b1f2c3752e56497e3868df8d34b25c3b888d66
 ingress:
   host: "" # TODO: api-dev.<domain>, once a domain is configured
-
 portals:
   customerPortal:
     apiBaseUrl: "" # TODO: https://api-dev.<domain> once a domain is configured, or the API Gateway endpoint in the meantime (`terraform output api_gateway_endpoint` in environments/dev) — set by the CI pipeline's UpdateGitOpsDev stage, not meant to stay a manual TODO
-
 services:
   customer-service:
     env:
