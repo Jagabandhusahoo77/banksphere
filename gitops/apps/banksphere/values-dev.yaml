@@ -25,7 +25,7 @@
 
 image:
   registry: "997979358886.dkr.ecr.us-east-1.amazonaws.com"
-  tag: e9b1f2c3752e56497e3868df8d34b25c3b888d66
+  tag: 2386957984df68dbc339893d407fb83efcdaa23b
 ingress:
   host: "" # TODO: api-dev.<domain>, once a domain is configured
 portals:
