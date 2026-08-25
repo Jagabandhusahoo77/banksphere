@@ -1,6 +1,14 @@
 import axios, { type AxiosInstance } from "axios";
 import { clearStoredAuth, getToken } from "./tokenStorage";
 import { ApiError } from "@/utils/apiError";
+import { getRuntimeApiBaseUrl } from "@/config/runtimeConfig";
+
+// Deployed environments route every backend service through the same
+// gateway, so the runtime config's single API_BASE_URL — when present —
+// takes priority over the VITE_*_SERVICE_URL build-time values, which
+// stay meaningful only for local dev (each service on its own localhost
+// port). See frontend/src/services/apiClient.ts's identical pattern.
+const RUNTIME_API_BASE_URL = getRuntimeApiBaseUrl();
 
 function createApiClient(baseURL: string): AxiosInstance {
   const client = axios.create({
@@ -36,7 +44,7 @@ function createApiClient(baseURL: string): AxiosInstance {
 }
 
 export const employeeApiClient = createApiClient(
-  import.meta.env.VITE_EMPLOYEE_SERVICE_URL ?? "http://localhost:8085",
+  RUNTIME_API_BASE_URL ?? import.meta.env.VITE_EMPLOYEE_SERVICE_URL ?? "http://localhost:8085",
 );
 
 // Phase 9C — KYC review endpoints are called directly (not proxied
@@ -44,5 +52,5 @@ export const employeeApiClient = createApiClient(
 // its own bounded domain with a complete employee-facing API surface of
 // its own. See ADR-008.
 export const kycApiClient = createApiClient(
-  import.meta.env.VITE_KYC_SERVICE_URL ?? "http://localhost:8086",
+  RUNTIME_API_BASE_URL ?? import.meta.env.VITE_KYC_SERVICE_URL ?? "http://localhost:8086",
 );

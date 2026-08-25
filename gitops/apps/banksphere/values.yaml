@@ -243,6 +243,15 @@ portals:
     repository: customer-portal # matches the ECR repo name — see modules/ecr's repository_names
     port: 80
     replicas: 1
+    # Injected as the API_BASE_URL container env var, read by the
+    # image's docker-entrypoint.d script at container start and
+    # written into config.js for the app to read at runtime (see
+    # frontend/src/config/runtimeConfig.ts) — this is what lets the
+    # SAME built image serve DEV and TEST correctly despite Vite
+    # baking config in at build time. Empty is a supported state
+    # (matches ingress.host's own convention): falls back to
+    # VITE_*_SERVICE_URL / localhost, same as local dev.
+    apiBaseUrl: ""
     resources:
       requests: { cpu: 50m, memory: 64Mi }
       limits: { memory: 128Mi }
@@ -251,6 +260,7 @@ portals:
     repository: employee-portal
     port: 80
     replicas: 1
+    apiBaseUrl: ""
     resources:
       requests: { cpu: 50m, memory: 64Mi }
       limits: { memory: 128Mi }

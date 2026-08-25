@@ -1,12 +1,17 @@
 {{- $root := . }}
 {{- range $key, $portal := .Values.portals }}
 {{- if $portal.enabled }}
-# Reference/fallback only — see values.yaml's own comment on why this is
-# disabled by default in every real environment (portals are served via
-# S3 + CloudFront, not Kubernetes). Vite bakes VITE_*_URL values into the
-# static build at image-build time (see frontend/Dockerfile /
-# employee-portal/Dockerfile build args) — there is nothing left to
-# configure at container-runtime, hence no env block here.
+# customerPortal is the real frontend hosting path (see values.yaml's
+# own comment); employeePortal stays disabled pending a decision on
+# where it should be served. The API_BASE_URL env var below is read by
+# the image's docker-entrypoint.d script at container start and written
+# into config.js for the app to read at runtime (see
+# frontend/src/config/runtimeConfig.ts) — Vite's build-time VITE_*_URL
+# values are baked in too, but only as the local-dev fallback; runtime
+# config takes priority whenever this is non-empty. This is what lets
+# ONE built image (per values.image.tag, promoted unchanged like the six
+# backend images) correctly serve different environments despite Vite
+# baking config in at build time.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -31,6 +36,9 @@ spec:
         - name: {{ $portal.repository }}
           image: {{ include "banksphere.image" (dict "registry" $root.Values.image.registry "repositoryPrefix" $root.Values.image.repositoryPrefix "repository" $portal.repository "tag" $root.Values.image.tag) }}
           imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          env:
+            - name: API_BASE_URL
+              value: {{ $portal.apiBaseUrl | default "" | quote }}
           ports:
             - containerPort: {{ $portal.port }}
           readinessProbe:

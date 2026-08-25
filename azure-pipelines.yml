@@ -41,26 +41,33 @@
 # an existing tag outright.
 #
 # Frontend images (customer-portal/employee-portal): a container image
-# is still built and pushed to ECR every run (see
-# infrastructure/terraform/modules/ecr's repository list), built with
-# EMPTY VITE_*_SERVICE_URL build-args — but that image is NOT what
-# DEV/TEST actually serve. It exists solely as a real, pushable artifact
-# for gitops/apps/banksphere's disabled-by-default in-cluster portal
-# Deployments (reference/fallback capability, reached through the same
-# Traefik Ingress as the backend — a genuinely same-origin scenario
-# where empty/relative URLs are correct).
+# is built and pushed to ECR every run (see
+# infrastructure/terraform/modules/ecr's repository list) — this IS what
+# DEV/TEST actually serve for customer-portal, via the public ALB ->
+# Traefik -> the in-cluster customer-portal Deployment (see
+# gitops/apps/banksphere/templates/ingress.yaml's frontend catch-all
+# rule). employeePortal stays disabled/unhosted pending a decision on
+# where it should be served (see values.yaml's own comment) — its image
+# is still built and pushed for consistency, but nothing deploys it yet.
 #
-# The REAL DEV/TEST serving path is S3 + CloudFront (see
-# docs/deployment/frontend-hosting.md), and CloudFront/S3 is a DIFFERENT
-# origin from api-<env>.<domain> — so the static build actually synced
-# to each environment's S3 bucket is built SEPARATELY, inside each
-# DeployFrontendsDev/DeployFrontendsTest stage, with the real
-# api-<env>.<domain> URL baked into VITE_*_SERVICE_URL. This is a
-# deliberate, narrow exception to "build once, promote the same
-# artifact": it applies only to the two frontends' STATIC (non-image)
-# build output, for the structural reason that Vite bakes config in at
-# build time and DEV/TEST are different origins — the six backend
-# Docker images are still built exactly once and promoted unchanged.
+# S3 + CloudFront hosting (the previous approach) was removed entirely
+# when the architecture moved to public ALB + API Gateway (see
+# docs/deployment/frontend-hosting.md) — there is no separate static
+# build/sync step anymore.
+#
+# Vite still bakes VITE_*_SERVICE_URL into the JS bundle at image-build
+# time, but that's now only the LOCAL-DEV fallback baked into the image
+# (matching each backend service's own localhost port) — the real,
+# per-environment API base URL is injected at container-STARTUP instead,
+# via a small runtime config.js the image's docker-entrypoint.d script
+# generates from an API_BASE_URL env var (see
+# frontend/src/config/runtimeConfig.ts and
+# gitops/apps/banksphere/templates/portal-deployment.yaml). This is what
+# lets the customer-portal image be built exactly ONCE per commit and
+# promoted unchanged from DEV to TEST, same as the six backend images —
+# UpdateGitOpsDev/UpdateGitOpsTest below set that env var (via
+# portals.customerPortal.apiBaseUrl) in the same GitOps commit that sets
+# image.tag.
 
 trigger:
   branches:
@@ -227,7 +234,7 @@ stages:
             artifact: "image-$(serviceName)"
 
       - job: BuildFrontendImages
-        displayName: "Build frontend images (reference-only ECR artifact — NOT what DEV/TEST actually serve)"
+        displayName: "Build frontend images"
         pool:
           vmImage: "ubuntu-latest"
         strategy:
@@ -239,32 +246,14 @@ stages:
               appDir: "employee-portal"
               imageName: "employee-portal"
         steps:
-          # Every VITE_*_SERVICE_URL build-arg is left EMPTY on purpose —
-          # this image is ONLY for gitops/apps/banksphere's disabled-by-
-          # default in-cluster portal Deployments (see values.yaml's
-          # "reference/fallback only" comment), where the portal is
-          # reached through the SAME Traefik Ingress as the backend, so
-          # a relative/same-origin API call is genuinely correct there.
-          # This is NOT the image/artifact that ends up on
-          # app-<env>.<domain>/ops-<env>.<domain> — see the real static
-          # build in DeployFrontendsDev/DeployFrontendsTest below, which
-          # bakes in the real cross-origin api-<env>.<domain> URL instead
-          # (S3+CloudFront is a different origin from the ALB — a
-          # relative URL there would silently resolve against
-          # app-<env>.<domain> itself and 404/rewrite to index.html, not
-          # reach the API — see docs/deployment/networking.md and
-          # docs/deployment/frontend-hosting.md for why these are NOT
-          # interchangeable, unlike the pre-rework single-ALB design
-          # where they were).
+          # No VITE_*_SERVICE_URL build-args: the real per-environment
+          # API base URL is injected at container-startup, not baked in
+          # at build time — see this stage's own header comment above
+          # and frontend/src/config/runtimeConfig.ts. The Dockerfiles'
+          # own ARG defaults (localhost ports) only ever matter as a
+          # fallback if runtime config injection somehow didn't run.
           - script: |
-              docker build \
-                --build-arg VITE_CUSTOMER_SERVICE_URL="" \
-                --build-arg VITE_ACCOUNT_SERVICE_URL="" \
-                --build-arg VITE_TRANSACTION_SERVICE_URL="" \
-                --build-arg VITE_BENEFICIARY_SERVICE_URL="" \
-                --build-arg VITE_KYC_SERVICE_URL="" \
-                --build-arg VITE_EMPLOYEE_SERVICE_URL="" \
-                -t "$(projectName)/$(imageName):$(imageTag)" "$(appDir)"
+              docker build -t "$(projectName)/$(imageName):$(imageTag)" "$(appDir)"
               docker save "$(projectName)/$(imageName):$(imageTag)" -o "$(Build.ArtifactStagingDirectory)/$(imageName).tar"
             displayName: "docker build $(imageName)"
           - publish: "$(Build.ArtifactStagingDirectory)/$(imageName).tar"
@@ -415,18 +404,21 @@ stages:
                     set -euo pipefail
                     cd "$(Build.SourcesDirectory)"
                     # yq (not sed) — a targeted, YAML-structure-aware edit
-                    # of exactly one key, so nothing else in the file
-                    # (comments, the TODO placeholders, formatting) is
-                    # touched.
+                    # of exactly these two keys, so nothing else in the
+                    # file (comments, the other TODO placeholders,
+                    # formatting) is touched.
                     curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
                     chmod +x /usr/local/bin/yq
+                    API_BASE="https://api-dev.$(DOMAIN_NAME)"
+                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="$(API_GATEWAY_ENDPOINT_DEV)"; fi
                     yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-dev.yaml
+                    yq -i ".portals.customerPortal.apiBaseUrl = \"$API_BASE\"" $(gitopsChartPath)/values-dev.yaml
                     git config user.name "banksphere-ci"
                     git config user.email "ci@banksphere.invalid"
                     git add $(gitopsChartPath)/values-dev.yaml
                     git commit -m "ci: deploy $(imageTag) to DEV [skip ci]"
                     git push origin HEAD:main
-                  displayName: "yq set image.tag + git commit + push"
+                  displayName: "yq set image.tag + portal apiBaseUrl + git commit + push"
 
   # =====================================================================
   # STAGE 8 — Smoke tests (DEV) — waits for Argo CD's own reconcile loop
@@ -448,12 +440,15 @@ stages:
           - script: |
               set -e
               BASE="https://api-dev.$(DOMAIN_NAME)"
-              # Falls back to the ALB's own DNS name if DOMAIN_NAME isn't
-              # set yet (see docs/deployment/dns-and-https.md) — pass
-              # ALB_DNS_NAME_DEV as a pipeline variable (from `terraform
-              # output alb_dns_name` in the dev environment) for this
-              # fallback to work.
-              if [ -z "$(DOMAIN_NAME)" ]; then BASE="http://$(ALB_DNS_NAME_DEV)"; fi
+              # Falls back to the API Gateway endpoint if DOMAIN_NAME
+              # isn't set yet (see docs/deployment/dns-and-https.md) —
+              # pass API_GATEWAY_ENDPOINT_DEV as a pipeline variable
+              # (from `terraform output api_gateway_endpoint` in the dev
+              # environment) for this fallback to work. NOT the public
+              # ALB's own DNS name — that ALB fronts the frontend now,
+              # not the backend (see this file's header comment on the
+              # architecture change).
+              if [ -z "$(DOMAIN_NAME)" ]; then BASE="$(API_GATEWAY_ENDPOINT_DEV)"; fi
               echo "Smoke-testing $BASE"
               curl -sf "$BASE/actuator/health"
               curl -sf -X POST "$BASE/api/v1/auth/otp/request" \
@@ -462,103 +457,12 @@ stages:
             displayName: "Health + a real, side-effect-free API call (generic OTP-request response — never reveals whether the identifier exists, safe to call blind)"
 
   # =====================================================================
-  # STAGE 9 — Deploy frontends (DEV) — S3 sync + CloudFront invalidation,
-  # NOT Argo CD/Kubernetes (see this file's header comment).
-  # =====================================================================
-  - stage: DeployFrontendsDev
-    displayName: "Deploy frontends (DEV) — S3 + CloudFront"
-    dependsOn: SmokeTestDev
-    jobs:
-      - deployment: DeployFrontendsDev
-        displayName: "Build with real DEV API URL, sync dist/ to S3, invalidate CloudFront"
-        environment: "banksphere-dev"
-        pool:
-          vmImage: "ubuntu-latest"
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                # Built HERE, per environment, with the REAL api-dev
-                # origin baked in — not the empty/relative build-args
-                # used for the reference-only Docker image above. This
-                # is a deliberate exception to "build once, promote the
-                # same artifact" for the two frontends specifically:
-                # Vite bakes config in at build time, DEV and TEST are
-                # different origins (api-dev vs api-test), and there is
-                # no runtime env-injection mechanism for a static S3
-                # site — so DEV and TEST genuinely need two different
-                # static builds, unlike the six backend Docker images
-                # (which are still built exactly once and promoted
-                # unchanged). See docs/deployment/frontend-hosting.md.
-                - task: NodeTool@0
-                  inputs:
-                    versionSpec: "24.x" # see FrontendTests stage's own comment on why a floating 24.x, not a pinned old release
-                - script: |
-                    set -euo pipefail
-                    node --version | grep -qE '^v24\.' || { echo "##[error]Expected Node 24.x, got $(node --version)"; exit 1; }
-                    echo "node: $(node --version), npm: $(npm --version), $(which node), $(which npm)"
-                    API_BASE="https://api-dev.$(DOMAIN_NAME)"
-                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_DEV)"; fi
-                    npm ci
-                    VITE_CUSTOMER_SERVICE_URL="$API_BASE" \
-                    VITE_ACCOUNT_SERVICE_URL="$API_BASE" \
-                    VITE_TRANSACTION_SERVICE_URL="$API_BASE" \
-                    VITE_BENEFICIARY_SERVICE_URL="$API_BASE" \
-                    VITE_KYC_SERVICE_URL="$API_BASE" \
-                      npm run build
-                  workingDirectory: "frontend"
-                  displayName: "npm run build (customer-portal, DEV API URL)"
-                - task: NodeTool@0
-                  inputs:
-                    versionSpec: "24.x"
-                - script: |
-                    set -euo pipefail
-                    node --version | grep -qE '^v24\.' || { echo "##[error]Expected Node 24.x, got $(node --version)"; exit 1; }
-                    echo "node: $(node --version), npm: $(npm --version), $(which node), $(which npm)"
-                    API_BASE="https://api-dev.$(DOMAIN_NAME)"
-                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_DEV)"; fi
-                    npm ci
-                    VITE_EMPLOYEE_SERVICE_URL="$API_BASE" \
-                    VITE_KYC_SERVICE_URL="$API_BASE" \
-                      npm run build
-                  workingDirectory: "employee-portal"
-                  displayName: "npm run build (employee-portal, DEV API URL)"
-                - task: S3Upload@1
-                  displayName: "Sync customer-portal dist/ to S3 (DEV)"
-                  inputs:
-                    awsCredentials: "$(awsServiceConnection)"
-                    regionName: "$(awsRegion)"
-                    bucketName: "$(S3_BUCKET_CUSTOMER_PORTAL_DEV)" # `terraform output s3_bucket_ids` in environments/dev
-                    sourceFolder: "$(Build.SourcesDirectory)/frontend/dist"
-                    globExpressions: "**"
-                    createBucket: false
-                - task: S3Upload@1
-                  displayName: "Sync employee-portal dist/ to S3 (DEV)"
-                  inputs:
-                    awsCredentials: "$(awsServiceConnection)"
-                    regionName: "$(awsRegion)"
-                    bucketName: "$(S3_BUCKET_EMPLOYEE_PORTAL_DEV)"
-                    sourceFolder: "$(Build.SourcesDirectory)/employee-portal/dist"
-                    globExpressions: "**"
-                    createBucket: false
-                - task: AWSShellScript@1
-                  displayName: "Invalidate CloudFront caches (DEV)"
-                  inputs:
-                    awsCredentials: "$(awsServiceConnection)"
-                    regionName: "$(awsRegion)"
-                    scriptType: "inline"
-                    inlineScript: |
-                      set -euo pipefail
-                      aws cloudfront create-invalidation --distribution-id "$(CLOUDFRONT_DIST_ID_APP_DEV)" --paths "/*"
-                      aws cloudfront create-invalidation --distribution-id "$(CLOUDFRONT_DIST_ID_OPS_DEV)" --paths "/*"
-
-  # =====================================================================
-  # STAGE 10 — Update GitOps image tag for TEST (promotion — same image,
+  # STAGE 9 — Update GitOps image tag for TEST (promotion — same image,
   # a new GitOps commit, never a rebuild).
   # =====================================================================
   - stage: UpdateGitOpsTest
     displayName: "Update GitOps image tag (TEST)"
-    dependsOn: DeployFrontendsDev
+    dependsOn: SmokeTestDev
     jobs:
       - deployment: UpdateGitOpsTest
         displayName: "Commit image.tag=$(imageTag) to values-test.yaml"
@@ -576,16 +480,19 @@ stages:
                     cd "$(Build.SourcesDirectory)"
                     curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
                     chmod +x /usr/local/bin/yq
+                    API_BASE="https://api-test.$(DOMAIN_NAME)"
+                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="$(API_GATEWAY_ENDPOINT_TEST)"; fi
                     yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-test.yaml
+                    yq -i ".portals.customerPortal.apiBaseUrl = \"$API_BASE\"" $(gitopsChartPath)/values-test.yaml
                     git config user.name "banksphere-ci"
                     git config user.email "ci@banksphere.invalid"
                     git add $(gitopsChartPath)/values-test.yaml
                     git commit -m "ci: promote $(imageTag) to TEST [skip ci]"
                     git push origin HEAD:main
-                  displayName: "yq set image.tag + git commit + push"
+                  displayName: "yq set image.tag + portal apiBaseUrl + git commit + push"
 
   # =====================================================================
-  # STAGE 11 — Smoke tests (TEST)
+  # STAGE 10 — Smoke tests (TEST)
   # =====================================================================
   - stage: SmokeTestTest
     displayName: "Smoke tests (TEST)"
@@ -602,7 +509,9 @@ stages:
           - script: |
               set -e
               BASE="https://api-test.$(DOMAIN_NAME)"
-              if [ -z "$(DOMAIN_NAME)" ]; then BASE="http://$(ALB_DNS_NAME_TEST)"; fi
+              # See SmokeTestDev's identical comment — falls back to the
+              # API Gateway endpoint, not the (frontend) public ALB.
+              if [ -z "$(DOMAIN_NAME)" ]; then BASE="$(API_GATEWAY_ENDPOINT_TEST)"; fi
               echo "Smoke-testing $BASE"
               curl -sf "$BASE/actuator/health"
               curl -sf -X POST "$BASE/api/v1/auth/otp/request" \
@@ -611,95 +520,13 @@ stages:
             displayName: "Health + a real, side-effect-free API call"
 
   # =====================================================================
-  # STAGE 12 — Deploy frontends (TEST) — same S3 + CloudFront pattern
-  # =====================================================================
-  - stage: DeployFrontendsTest
-    displayName: "Deploy frontends (TEST) — S3 + CloudFront"
-    dependsOn: SmokeTestTest
-    jobs:
-      - deployment: DeployFrontendsTest
-        displayName: "Build with real TEST API URL, sync dist/ to S3, invalidate CloudFront"
-        environment: "banksphere-test"
-        pool:
-          vmImage: "ubuntu-latest"
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                # See DeployFrontendsDev's identical comment — TEST gets
-                # its own build (api-test origin), not the DEV artifact
-                # re-synced, for the same "Vite bakes config at build
-                # time, two different origins" reason.
-                - task: NodeTool@0
-                  inputs:
-                    versionSpec: "24.x"
-                - script: |
-                    set -euo pipefail
-                    node --version | grep -qE '^v24\.' || { echo "##[error]Expected Node 24.x, got $(node --version)"; exit 1; }
-                    echo "node: $(node --version), npm: $(npm --version), $(which node), $(which npm)"
-                    API_BASE="https://api-test.$(DOMAIN_NAME)"
-                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_TEST)"; fi
-                    npm ci
-                    VITE_CUSTOMER_SERVICE_URL="$API_BASE" \
-                    VITE_ACCOUNT_SERVICE_URL="$API_BASE" \
-                    VITE_TRANSACTION_SERVICE_URL="$API_BASE" \
-                    VITE_BENEFICIARY_SERVICE_URL="$API_BASE" \
-                    VITE_KYC_SERVICE_URL="$API_BASE" \
-                      npm run build
-                  workingDirectory: "frontend"
-                  displayName: "npm run build (customer-portal, TEST API URL)"
-                - task: NodeTool@0
-                  inputs:
-                    versionSpec: "24.x"
-                - script: |
-                    set -euo pipefail
-                    node --version | grep -qE '^v24\.' || { echo "##[error]Expected Node 24.x, got $(node --version)"; exit 1; }
-                    echo "node: $(node --version), npm: $(npm --version), $(which node), $(which npm)"
-                    API_BASE="https://api-test.$(DOMAIN_NAME)"
-                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="http://$(ALB_DNS_NAME_TEST)"; fi
-                    npm ci
-                    VITE_EMPLOYEE_SERVICE_URL="$API_BASE" \
-                    VITE_KYC_SERVICE_URL="$API_BASE" \
-                      npm run build
-                  workingDirectory: "employee-portal"
-                  displayName: "npm run build (employee-portal, TEST API URL)"
-                - task: S3Upload@1
-                  displayName: "Sync customer-portal dist/ to S3 (TEST)"
-                  inputs:
-                    awsCredentials: "$(awsServiceConnection)"
-                    regionName: "$(awsRegion)"
-                    bucketName: "$(S3_BUCKET_CUSTOMER_PORTAL_TEST)"
-                    sourceFolder: "$(Build.SourcesDirectory)/frontend/dist"
-                    globExpressions: "**"
-                    createBucket: false
-                - task: S3Upload@1
-                  displayName: "Sync employee-portal dist/ to S3 (TEST)"
-                  inputs:
-                    awsCredentials: "$(awsServiceConnection)"
-                    regionName: "$(awsRegion)"
-                    bucketName: "$(S3_BUCKET_EMPLOYEE_PORTAL_TEST)"
-                    sourceFolder: "$(Build.SourcesDirectory)/employee-portal/dist"
-                    globExpressions: "**"
-                    createBucket: false
-                - task: AWSShellScript@1
-                  displayName: "Invalidate CloudFront caches (TEST)"
-                  inputs:
-                    awsCredentials: "$(awsServiceConnection)"
-                    regionName: "$(awsRegion)"
-                    scriptType: "inline"
-                    inlineScript: |
-                      set -euo pipefail
-                      aws cloudfront create-invalidation --distribution-id "$(CLOUDFRONT_DIST_ID_APP_TEST)" --paths "/*"
-                      aws cloudfront create-invalidation --distribution-id "$(CLOUDFRONT_DIST_ID_OPS_TEST)" --paths "/*"
-
-  # =====================================================================
-  # STAGE 13 — Future production approval (NO DEPLOY — see
+  # STAGE 11 — Future production approval (NO DEPLOY — see
   # infrastructure/terraform/environments/prod/README.md and
   # gitops/environments/prod/README.md)
   # =====================================================================
   - stage: FutureProductionApproval
     displayName: "Future production approval (not implemented)"
-    dependsOn: DeployFrontendsTest
+    dependsOn: SmokeTestTest
     jobs:
       - job: NotImplemented
         pool:

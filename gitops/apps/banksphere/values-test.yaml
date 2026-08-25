@@ -9,6 +9,10 @@ image:
 ingress:
   host: "" # TODO: api-test.<domain>, once a domain is configured
 
+portals:
+  customerPortal:
+    apiBaseUrl: "" # TODO: https://api-test.<domain> once a domain is configured, or the API Gateway endpoint in the meantime (`terraform output api_gateway_endpoint` in environments/test) — set by the CI pipeline's UpdateGitOpsTest stage, not meant to stay a manual TODO
+
 services:
   customer-service:
     env:

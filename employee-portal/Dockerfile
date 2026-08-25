@@ -21,6 +21,8 @@ RUN npm run build
 FROM nginx:1.31.4-alpine
 COPY --from=build /build/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker-entrypoint.d/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
+RUN chmod +x /docker-entrypoint.d/40-runtime-config.sh
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

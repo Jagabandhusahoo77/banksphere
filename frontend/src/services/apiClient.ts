@@ -2,8 +2,18 @@ import axios, { type AxiosInstance } from "axios";
 import { clearStoredAuth, getStoredAuth, getToken, setStoredAuth } from "./tokenStorage";
 import { ApiError } from "@/utils/apiError";
 import type { AuthResponse } from "@/types/auth";
+import { getRuntimeApiBaseUrl } from "@/config/runtimeConfig";
 
-const CUSTOMER_SERVICE_URL = import.meta.env.VITE_CUSTOMER_SERVICE_URL ?? "http://localhost:8081";
+// Deployed environments route every backend service through the same
+// gateway (see docs/deployment/frontend-hosting.md), so the runtime
+// config's single API_BASE_URL — when present — takes priority over
+// the five individually-named VITE_*_SERVICE_URL build-time values,
+// which stay meaningful only for local dev (each service on its own
+// localhost port).
+const RUNTIME_API_BASE_URL = getRuntimeApiBaseUrl();
+
+const CUSTOMER_SERVICE_URL =
+  RUNTIME_API_BASE_URL ?? import.meta.env.VITE_CUSTOMER_SERVICE_URL ?? "http://localhost:8081";
 
 /**
  * Phase 9D — a request to `/api/v1/auth/token/refresh` is the one call in
@@ -107,17 +117,17 @@ function createApiClient(baseURL: string, withCredentials = false): AxiosInstanc
 export const customerApiClient = createApiClient(CUSTOMER_SERVICE_URL, true);
 
 export const accountApiClient = createApiClient(
-  import.meta.env.VITE_ACCOUNT_SERVICE_URL ?? "http://localhost:8082",
+  RUNTIME_API_BASE_URL ?? import.meta.env.VITE_ACCOUNT_SERVICE_URL ?? "http://localhost:8082",
 );
 
 export const transactionApiClient = createApiClient(
-  import.meta.env.VITE_TRANSACTION_SERVICE_URL ?? "http://localhost:8083",
+  RUNTIME_API_BASE_URL ?? import.meta.env.VITE_TRANSACTION_SERVICE_URL ?? "http://localhost:8083",
 );
 
 export const beneficiaryApiClient = createApiClient(
-  import.meta.env.VITE_BENEFICIARY_SERVICE_URL ?? "http://localhost:8084",
+  RUNTIME_API_BASE_URL ?? import.meta.env.VITE_BENEFICIARY_SERVICE_URL ?? "http://localhost:8084",
 );
 
 export const kycApiClient = createApiClient(
-  import.meta.env.VITE_KYC_SERVICE_URL ?? "http://localhost:8086",
+  RUNTIME_API_BASE_URL ?? import.meta.env.VITE_KYC_SERVICE_URL ?? "http://localhost:8086",
 );

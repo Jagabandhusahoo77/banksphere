@@ -7,6 +7,13 @@
     <meta name="theme-color" content="#0B5FA3" />
     <link rel="icon" type="image/svg+xml" href="/src/assets/branding/favicon.svg" />
     <title>BankSphere — Digital Banking</title>
+    <!-- Runtime config, rewritten from config.js.template by the Docker
+         image's entrypoint at container start (see
+         docker-entrypoint.d/40-runtime-config.sh). A plain script tag,
+         not type="module", so it runs synchronously before the
+         (deferred-by-default) module bundle below — see
+         src/config/runtimeConfig.ts. -->
+    <script src="/config.js"></script>
   </head>
   <body>
     <div id="root"></div>
