@@ -409,8 +409,24 @@ stages:
                     # formatting) is touched.
                     curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
                     chmod +x /usr/local/bin/yq
-                    API_BASE="https://api-dev.$(DOMAIN_NAME)"
-                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="$(API_GATEWAY_ENDPOINT_DEV)"; fi
+                    # Deliberately ${DOMAIN_NAME:-}, not the $(DOMAIN_NAME)
+                    # macro seen elsewhere in this file: Azure Pipelines
+                    # only text-substitutes a $(Var) macro if that
+                    # pipeline variable is actually DEFINED (even as an
+                    # empty string) — an undefined one is left as
+                    # literal "$(Var)" text, which bash then parses as
+                    # ITS OWN command-substitution syntax and tries to
+                    # run a command called "DOMAIN_NAME", failing with
+                    # "command not found". DOMAIN_NAME/
+                    # API_GATEWAY_ENDPOINT_DEV don't need an explicit
+                    # `env:` mapping either — Azure Pipelines already
+                    # auto-injects every pipeline variable as a
+                    # same-named OS environment variable into every
+                    # script step (no macro substitution involved), so
+                    # ${VAR:-} here is empty when genuinely unset and
+                    # never a literal "$(...)" string.
+                    API_BASE="https://api-dev.${DOMAIN_NAME:-}"
+                    if [ -z "${DOMAIN_NAME:-}" ]; then API_BASE="${API_GATEWAY_ENDPOINT_DEV:-}"; fi
                     yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-dev.yaml
                     yq -i ".portals.customerPortal.apiBaseUrl = \"$API_BASE\"" $(gitopsChartPath)/values-dev.yaml
                     git config user.name "banksphere-ci"
@@ -439,7 +455,15 @@ stages:
             displayName: "Wait for Argo CD reconcile"
           - script: |
               set -e
-              BASE="https://api-dev.$(DOMAIN_NAME)"
+              # ${DOMAIN_NAME:-}, not the $(DOMAIN_NAME) macro — see
+              # UpdateGitOpsDev's identical comment on why: an undefined
+              # pipeline variable referenced via $(...) is left as
+              # literal unexpanded text, which bash then misparses as
+              # its own command-substitution syntax and fails with
+              # "command not found". Pipeline variables are auto-injected
+              # as same-named OS env vars into every script step, so
+              # ${VAR:-} here needs no explicit `env:` mapping either.
+              BASE="https://api-dev.${DOMAIN_NAME:-}"
               # Falls back to the API Gateway endpoint if DOMAIN_NAME
               # isn't set yet (see docs/deployment/dns-and-https.md) —
               # pass API_GATEWAY_ENDPOINT_DEV as a pipeline variable
@@ -448,7 +472,7 @@ stages:
               # ALB's own DNS name — that ALB fronts the frontend now,
               # not the backend (see this file's header comment on the
               # architecture change).
-              if [ -z "$(DOMAIN_NAME)" ]; then BASE="$(API_GATEWAY_ENDPOINT_DEV)"; fi
+              if [ -z "${DOMAIN_NAME:-}" ]; then BASE="${API_GATEWAY_ENDPOINT_DEV:-}"; fi
               echo "Smoke-testing $BASE"
               curl -sf "$BASE/actuator/health"
               curl -sf -X POST "$BASE/api/v1/auth/otp/request" \
@@ -480,8 +504,10 @@ stages:
                     cd "$(Build.SourcesDirectory)"
                     curl -fsSL -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
                     chmod +x /usr/local/bin/yq
-                    API_BASE="https://api-test.$(DOMAIN_NAME)"
-                    if [ -z "$(DOMAIN_NAME)" ]; then API_BASE="$(API_GATEWAY_ENDPOINT_TEST)"; fi
+                    # ${DOMAIN_NAME:-}, not the $(DOMAIN_NAME) macro —
+                    # see UpdateGitOpsDev's identical comment above.
+                    API_BASE="https://api-test.${DOMAIN_NAME:-}"
+                    if [ -z "${DOMAIN_NAME:-}" ]; then API_BASE="${API_GATEWAY_ENDPOINT_TEST:-}"; fi
                     yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-test.yaml
                     yq -i ".portals.customerPortal.apiBaseUrl = \"$API_BASE\"" $(gitopsChartPath)/values-test.yaml
                     git config user.name "banksphere-ci"
@@ -508,10 +534,12 @@ stages:
             displayName: "Wait for Argo CD reconcile"
           - script: |
               set -e
-              BASE="https://api-test.$(DOMAIN_NAME)"
+              # ${DOMAIN_NAME:-}, not the $(DOMAIN_NAME) macro — see
+              # UpdateGitOpsDev's identical comment.
+              BASE="https://api-test.${DOMAIN_NAME:-}"
               # See SmokeTestDev's identical comment — falls back to the
               # API Gateway endpoint, not the (frontend) public ALB.
-              if [ -z "$(DOMAIN_NAME)" ]; then BASE="$(API_GATEWAY_ENDPOINT_TEST)"; fi
+              if [ -z "${DOMAIN_NAME:-}" ]; then BASE="${API_GATEWAY_ENDPOINT_TEST:-}"; fi
               echo "Smoke-testing $BASE"
               curl -sf "$BASE/actuator/health"
               curl -sf -X POST "$BASE/api/v1/auth/otp/request" \
