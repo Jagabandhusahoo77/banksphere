@@ -12,12 +12,18 @@ module "acm_public_alb" {
     aws = aws
   }
 
-  project_name    = var.project_name
-  environment     = var.environment
-  cert_purpose    = "public-alb"
-  primary_fqdn    = local.app_fqdn
-  route53_zone_id = local.effective_zone_id
-  tags            = local.common_tags
+  project_name = var.project_name
+  environment  = var.environment
+  cert_purpose = "public-alb"
+  primary_fqdn = local.app_fqdn
+  # ops_fqdn (employee-portal) shares this cert/listener rather than
+  # getting its own — same public ALB, same HTTPS listener, differentiated
+  # by Host header at the Traefik Ingress layer, not by a separate
+  # cert/listener. See gitops/apps/banksphere/templates/ingress.yaml's
+  # second host-scoped rule.
+  additional_fqdns = [local.ops_fqdn]
+  route53_zone_id  = local.effective_zone_id
+  tags             = local.common_tags
 }
 
 # For API Gateway's custom domain (api-dev.<domain>) — reused by

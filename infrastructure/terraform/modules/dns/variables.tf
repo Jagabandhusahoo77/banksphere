@@ -36,3 +36,9 @@ variable "alb_zone_id" {
   type    = string
   default = ""
 }
+
+variable "ops_fqdn" {
+  description = "Employee-portal hostname, e.g. \"ops-dev.example.com\" — aliases to the SAME public ALB as app_fqdn (alb_dns_name/alb_zone_id below), differentiated by Host header at the Traefik Ingress layer, not a separate AWS resource."
+  type        = string
+  default     = ""
+}

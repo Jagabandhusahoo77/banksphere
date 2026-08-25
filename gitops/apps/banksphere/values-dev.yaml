@@ -1,53 +1,54 @@
 # DEV overrides layered on top of values.yaml. Only what genuinely
 # differs for this environment — see values.yaml's header comment.
 #
-# Everything marked TODO below is a real, currently-unknown value and
-# MUST be filled in as part of actually standing up DEV, not left as-is:
-#   - ingress.host / the CORS/origin values: only meaningful once a real
-#     domain is configured (environments/dev's own domain_name variable)
-#     — see docs/deployment/dns-and-https.md. Left empty here is a fully
-#     supported state (matches modules/dns's domain_configured gate):
-#     the environment is still reachable over the ALB's own AWS-assigned
-#     DNS name / the CloudFront distributions' own *.cloudfront.net
-#     names, just without pretty hostnames or a valid CORS allow-list
-#     for a browser-based flow yet.
+# image.registry / image.tag: see the header comment history in git log
+# for why registry is a fixed, environment-static value (not a TODO)
+# while tag is rewritten on every deploy by the CI pipeline's
+# UpdateGitOpsDev stage.
 #
-# image.registry is NOT a TODO — it's a fixed, environment-static value
-# (this AWS account/region's ECR registry hostname, from `terraform
-# output ecr_repository_urls` in environments/dev) set once here, unlike
-# image.tag which the CI pipeline's UpdateGitOpsDev stage rewrites on
-# every deploy. Leaving it empty makes templates/_helpers.tpl's
-# banksphere.image build a bare "banksphere/<service>:<tag>" reference
-# with no registry host — Kubernetes then resolves that against Docker
-# Hub by default instead of ECR, so every pod fails to pull and nothing
-# ever becomes Ready (this is why the ALB target group showed unhealthy
-# and every route 404'd).
+# A real domain (bankspere.in.net) is configured as of this pass — see
+# environments/dev/terraform.tfvars and dns.tf/acm.tf — so every
+# hostname/CORS-origin value below is now a real, filled-in value
+# instead of the earlier "no domain yet" empty-string TODOs.
 
 image:
   registry: "997979358886.dkr.ecr.us-east-1.amazonaws.com"
   tag: e9b1f2c3752e56497e3868df8d34b25c3b888d66
 ingress:
-  host: "" # TODO: api-dev.<domain>, once a domain is configured
+  # Deliberately still empty, NOT api-dev.bankspere.in.net — this rule
+  # is shared by BOTH the backend paths (reached via api-dev, through
+  # API Gateway/the private ALB) AND customerPortal's "/" catch-all
+  # (reached via app-dev, through the public ALB directly). Path-based
+  # matching already separates the two correctly regardless of which
+  # hostname a request arrived on; giving this rule a specific host
+  # would make it match ONLY that one hostname and silently 404 every
+  # app-dev request (no other rule handles app-dev). opsHost below is
+  # safe to set because employee-portal genuinely owns its own
+  # dedicated rule/hostname, unlike this one.
+  host: ""
+  opsHost: "ops-dev.bankspere.in.net"
 portals:
   customerPortal:
-    apiBaseUrl: "" # TODO: https://api-dev.<domain> once a domain is configured, or the API Gateway endpoint in the meantime (`terraform output api_gateway_endpoint` in environments/dev) — set by the CI pipeline's UpdateGitOpsDev stage, not meant to stay a manual TODO
+    apiBaseUrl: "https://api-dev.bankspere.in.net"
+  employeePortal:
+    apiBaseUrl: "https://api-dev.bankspere.in.net"
 services:
   customer-service:
     env:
-      CORS_ALLOWED_ORIGINS: "" # TODO: https://app-dev.<domain>
-      COOKIE_SECURE: "false" # TODO: "true" once served over HTTPS (api-dev.<domain> with a validated ACM cert)
+      CORS_ALLOWED_ORIGINS: "https://app-dev.bankspere.in.net"
+      COOKIE_SECURE: "true"
   account-service:
     env:
-      CORS_ALLOWED_ORIGINS: "" # TODO: https://app-dev.<domain>
+      CORS_ALLOWED_ORIGINS: "https://app-dev.bankspere.in.net"
   transaction-service:
     env:
-      CORS_ALLOWED_ORIGINS: "" # TODO: https://app-dev.<domain>
+      CORS_ALLOWED_ORIGINS: "https://app-dev.bankspere.in.net"
   beneficiary-service:
     env:
-      CORS_ALLOWED_ORIGINS: "" # TODO: https://app-dev.<domain>
+      CORS_ALLOWED_ORIGINS: "https://app-dev.bankspere.in.net"
   employee-service:
     env:
-      EMPLOYEE_PORTAL_CORS_ORIGIN: "" # TODO: https://ops-dev.<domain>
+      EMPLOYEE_PORTAL_CORS_ORIGIN: "https://ops-dev.bankspere.in.net"
   kyc-service:
     env:
-      KYC_CORS_ALLOWED_ORIGINS: "" # TODO: https://app-dev.<domain>,https://ops-dev.<domain>
+      KYC_CORS_ALLOWED_ORIGINS: "https://app-dev.bankspere.in.net,https://ops-dev.bankspere.in.net"

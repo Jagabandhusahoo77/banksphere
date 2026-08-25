@@ -64,4 +64,24 @@ spec:
                 port:
                   number: {{ .Values.portals.customerPortal.port }}
           {{- end }}
+    {{- if and .Values.portals.employeePortal.enabled .Values.ingress.opsHost }}
+    # A second, separate rule — its own `host:` is what differentiates
+    # it from the rule above, which has no host restriction and would
+    # otherwise catch every request (Traefik/Kubernetes Ingress treats a
+    # host-less rule as the wildcard fallback). Requests carrying
+    # ops-<env>.<domain> as their Host header match THIS rule instead
+    # and go straight to employee-portal; every other host (app-<env>,
+    # api-<env>, or the raw ALB DNS name) is unaffected and keeps
+    # matching the rule above exactly as before.
+    - host: {{ .Values.ingress.opsHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.portals.employeePortal.repository }}
+                port:
+                  number: {{ .Values.portals.employeePortal.port }}
+    {{- end }}
 {{- end }}

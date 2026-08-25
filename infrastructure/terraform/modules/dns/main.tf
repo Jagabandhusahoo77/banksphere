@@ -47,3 +47,17 @@ resource "aws_route53_record" "app" {
     evaluate_target_health = true
   }
 }
+
+resource "aws_route53_record" "ops" {
+  count = var.zone_id != "" && var.ops_fqdn != "" && var.alb_dns_name != "" ? 1 : 0
+
+  zone_id = var.zone_id
+  name    = var.ops_fqdn
+  type    = "A"
+
+  alias {
+    name                   = var.alb_dns_name
+    zone_id                = var.alb_zone_id
+    evaluate_target_health = true
+  }
+}

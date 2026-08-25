@@ -31,10 +31,8 @@ module "dns" {
   alb_dns_name = module.alb.dns_name
   alb_zone_id  = module.alb.zone_id
 
-  # ops_fqdn (employee-portal) is intentionally NOT wired to anything
-  # here — CloudFront (its previous target) was removed, and the target
-  # architecture this environment now implements doesn't specify where
-  # the employee portal should be served from. This is a genuine open
-  # decision, not a silent removal — see the architecture-change
-  # report's own callout.
+  # ops_fqdn (employee-portal) — same public ALB as app_fqdn, routed to
+  # the employee-portal Service by Host header at the Traefik Ingress
+  # layer (see gitops/apps/banksphere/templates/ingress.yaml).
+  ops_fqdn = local.ops_fqdn
 }

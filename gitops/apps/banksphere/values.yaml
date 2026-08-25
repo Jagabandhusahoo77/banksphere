@@ -58,6 +58,14 @@ ingress:
   # domain_configured gate): Traefik still gets an Ingress with no host
   # rule, reachable via the ALB regardless of hostname.
   host: ""
+  # ops-dev.<domain> / ops-test.<domain> — employee-portal's own host,
+  # a SEPARATE Ingress rule from the one above (see templates/ingress.yaml)
+  # so it can be routed to a different backend Service by Host header.
+  # Empty is a supported state, same reasoning as host above: with
+  # employeePortal.enabled but this left empty, templates/ingress.yaml
+  # skips the rule entirely rather than creating a host-less one that
+  # would collide with the rule above.
+  opsHost: ""
 
 postgres:
   enabled: true
@@ -232,11 +240,12 @@ services:
 # rule. No longer S3 + CloudFront (removed — see
 # docs/deployment/frontend-hosting.md's superseding note).
 #
-# employeePortal stays disabled — where the employee portal should be
-# served from under the new architecture is a genuine open question,
-# not decided here (it has no CloudFront/S3 target anymore either,
-# since that hosting path was removed entirely). Flagged explicitly in
-# the architecture-change report rather than silently resolved.
+# employeePortal is now also real: same public ALB as customerPortal,
+# reached on its own hostname (ingress.opsHost) via templates/
+# ingress.yaml's second, host-scoped rule — not path-based like the
+# backend services, since a portal owns its whole origin. See
+# environments/dev/dns.tf's ops_fqdn wiring and acm.tf's
+# additional_fqdns (the SAME public-ALB certificate covers both hosts).
 portals:
   customerPortal:
     enabled: true
@@ -256,7 +265,7 @@ portals:
       requests: { cpu: 50m, memory: 64Mi }
       limits: { memory: 128Mi }
   employeePortal:
-    enabled: false
+    enabled: true
     repository: employee-portal
     port: 80
     replicas: 1
