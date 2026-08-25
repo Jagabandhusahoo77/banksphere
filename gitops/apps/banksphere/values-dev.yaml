@@ -1,13 +1,8 @@
 # DEV overrides layered on top of values.yaml. Only what genuinely
 # differs for this environment — see values.yaml's header comment.
 #
-# Everything marked TODO below is a real, currently-unknown value (no
-# AWS resources have been created this phase — see the Phase 10A
-# report's "AWS credentials" note) and MUST be filled in as part of
-# actually standing up DEV, not left as-is:
-#   - image.registry: the ECR registry hostname, a Terraform OUTPUT
-#     (`terraform output` in environments/dev, after `apply`) —
-#     <account-id>.dkr.ecr.<region>.amazonaws.com.
+# Everything marked TODO below is a real, currently-unknown value and
+# MUST be filled in as part of actually standing up DEV, not left as-is:
 #   - ingress.host / the CORS/origin values: only meaningful once a real
 #     domain is configured (environments/dev's own domain_name variable)
 #     — see docs/deployment/dns-and-https.md. Left empty here is a fully
@@ -16,9 +11,20 @@
 #     DNS name / the CloudFront distributions' own *.cloudfront.net
 #     names, just without pretty hostnames or a valid CORS allow-list
 #     for a browser-based flow yet.
+#
+# image.registry is NOT a TODO — it's a fixed, environment-static value
+# (this AWS account/region's ECR registry hostname, from `terraform
+# output ecr_repository_urls` in environments/dev) set once here, unlike
+# image.tag which the CI pipeline's UpdateGitOpsDev stage rewrites on
+# every deploy. Leaving it empty makes templates/_helpers.tpl's
+# banksphere.image build a bare "banksphere/<service>:<tag>" reference
+# with no registry host — Kubernetes then resolves that against Docker
+# Hub by default instead of ECR, so every pod fails to pull and nothing
+# ever becomes Ready (this is why the ALB target group showed unhealthy
+# and every route 404'd).
 
 image:
-  registry: "" # TODO: fill in after `terraform apply` in environments/dev — see header comment
+  registry: "997979358886.dkr.ecr.us-east-1.amazonaws.com"
   tag: e9b1f2c3752e56497e3868df8d34b25c3b888d66
 ingress:
   host: "" # TODO: api-dev.<domain>, once a domain is configured

@@ -1,10 +1,18 @@
 # TEST overrides layered on top of values.yaml — mirrors values-dev.yaml
 # exactly, with "-test" hostnames. See values-dev.yaml's header comment
-# for what every TODO below actually means and why it's genuinely
-# unknown at this point (no AWS resources created this phase).
+# for what every remaining TODO below actually means and why it's
+# genuinely unknown at this point (no AWS resources created for TEST
+# yet — see environments/test).
+#
+# image.registry is set (not a TODO) even though TEST itself hasn't been
+# applied yet: ECR is a single shared registry across DEV/TEST in this
+# same AWS account/region (see environments/test/ecr.tf's data-source
+# lookup against DEV's repos), so the hostname is identical and known
+# now — see values-dev.yaml's own comment for why leaving this empty
+# breaks every pod's image pull once TEST does get stood up.
 
 image:
-  registry: "" # TODO: fill in after `terraform apply` in environments/test — see values-dev.yaml
+  registry: "997979358886.dkr.ecr.us-east-1.amazonaws.com"
 
 ingress:
   host: "" # TODO: api-test.<domain>, once a domain is configured
