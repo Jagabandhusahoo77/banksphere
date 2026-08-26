@@ -13,7 +13,7 @@
 
 image:
   registry: "997979358886.dkr.ecr.us-east-1.amazonaws.com"
-  tag: e9b1f2c3752e56497e3868df8d34b25c3b888d66
+  tag: 5ab9041b6dbcbf139328db1fa7b2c2f03f6616d9
 ingress:
   # Deliberately still empty, NOT api-dev.bankspere.in.net — this rule
   # is shared by BOTH the backend paths (reached via api-dev, through
