@@ -20,6 +20,13 @@ resource "aws_ecr_repository" "this" {
   name                 = "${var.project_name}/${each.value}"
   image_tag_mutability = "IMMUTABLE" # never overwrite a tag once pushed — see the task's own "prefer git commit SHA, never latest" requirement
 
+  # Terraform's own plan/apply approval is already the real safety gate
+  # for a destroy in this workflow — nothing runs without a human
+  # confirming it first. Without this, `terraform destroy` fails outright
+  # on any repo that still has images (AWS's own guard, redundant here),
+  # forcing a manual image-by-image cleanup first every time.
+  force_delete = true
+
   image_scanning_configuration {
     scan_on_push = true
   }
