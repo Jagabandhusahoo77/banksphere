@@ -29,7 +29,7 @@ ingress:
   opsHost: "ops-dev.bankspere.in.net"
 portals:
   customerPortal:
-    apiBaseUrl: "https://obfjbtdwq8.execute-api.us-east-1.amazonaws.com"
+    apiBaseUrl: "https://api-dev.bankspere.in.net"
   employeePortal:
     apiBaseUrl: "https://api-dev.bankspere.in.net"
 services:
