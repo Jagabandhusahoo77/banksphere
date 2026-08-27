@@ -19,6 +19,17 @@ RUN npm run build
 # the exact CVEs this addresses (CVE-2025-32414/32415/49794/49795/49796,
 # CVE-2026-6732, CVE-2026-40200, CVE-2026-27135, CVE-2026-22184).
 FROM nginx:1.31.4-alpine
+# CVE-2026-14456 (OpenSSL DoS via unbounded memory growth in QUIC server)
+# — fixed in libssl3/libcrypto3 3.5.8-r0, which Alpine's 3.24 package
+# repo has published but no nginx:*-alpine tag has been rebuilt with yet
+# (confirmed: nginx:1.31.4-alpine, the floating nginx:alpine tag, and
+# even alpine:edge are all still on 3.5.7-r0 as of this build — there is
+# currently no base-image upgrade path for this one). A targeted upgrade
+# of exactly these two packages, not a blanket `apk upgrade`, pulls the
+# fix from the SAME Alpine 3.24 branch already in use — no version jump,
+# no untested packages. Revisit/remove once a published tag ships this
+# baked in.
+RUN apk add --no-cache --upgrade libssl3 libcrypto3
 COPY --from=build /build/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.d/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
