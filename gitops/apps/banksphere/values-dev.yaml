@@ -13,7 +13,7 @@
 
 image:
   registry: "997979358886.dkr.ecr.us-east-1.amazonaws.com"
-  tag: 5ab9041b6dbcbf139328db1fa7b2c2f03f6616d9
+  tag: 134ea936b039ebd38060cd747ff9618c58ecd0e6
 ingress:
   # Deliberately still empty, NOT api-dev.bankspere.in.net — this rule
   # is shared by BOTH the backend paths (reached via api-dev, through
@@ -29,7 +29,7 @@ ingress:
   opsHost: "ops-dev.bankspere.in.net"
 portals:
   customerPortal:
-    apiBaseUrl: "https://api-dev.bankspere.in.net"
+    apiBaseUrl: "https://obfjbtdwq8.execute-api.us-east-1.amazonaws.com"
   employeePortal:
     apiBaseUrl: "https://api-dev.bankspere.in.net"
 services:
