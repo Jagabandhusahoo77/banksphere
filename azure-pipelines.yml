@@ -73,6 +73,20 @@ trigger:
   branches:
     include:
       - main
+  paths:
+    # UpdateGitOpsDev/UpdateGitOpsTest push a commit here ("ci: deploy
+    # <sha> to DEV/TEST [skip ci]") on every successful run — but Azure
+    # Pipelines has no built-in support for that GitHub-convention
+    # marker, so without this exclusion every one of those commits was
+    # ALSO re-triggering the pipeline (build the same already-pushed
+    # images again, hit ECR's immutable-tag rejection, push yet another
+    # GitOps commit, repeat). A push is excluded from triggering only
+    # when EVERY changed file matches one of these paths — a real code
+    # change always touches something else too, so this only ever skips
+    # the CI's own values-file-only commits, never a genuine one.
+    exclude:
+      - gitops/apps/banksphere/values-dev.yaml
+      - gitops/apps/banksphere/values-test.yaml
 
 pr:
   branches:
