@@ -441,10 +441,17 @@ stages:
                     # never a literal "$(...)" string.
                     API_BASE="https://api-dev.${DOMAIN_NAME:-}"
                     if [ -z "${DOMAIN_NAME:-}" ]; then API_BASE="${API_GATEWAY_ENDPOINT_DEV:-}"; fi
-                    yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-dev.yaml
-                    yq -i ".portals.customerPortal.apiBaseUrl = \"$API_BASE\"" $(gitopsChartPath)/values-dev.yaml
                     git config user.name "banksphere-ci"
                     git config user.email "ci@banksphere.invalid"
+                    # checkout: self pins to this run's ORIGINAL trigger
+                    # commit, not live main — sync to the actual current
+                    # tip right before editing so this push is always a
+                    # fast-forward, regardless of what else has landed
+                    # on main since the run started.
+                    git fetch origin main
+                    git reset --hard origin/main
+                    yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-dev.yaml
+                    yq -i ".portals.customerPortal.apiBaseUrl = \"$API_BASE\"" $(gitopsChartPath)/values-dev.yaml
                     git add $(gitopsChartPath)/values-dev.yaml
                     git commit -m "ci: deploy $(imageTag) to DEV [skip ci]"
                     git push origin HEAD:main
@@ -522,10 +529,18 @@ stages:
                     # see UpdateGitOpsDev's identical comment above.
                     API_BASE="https://api-test.${DOMAIN_NAME:-}"
                     if [ -z "${DOMAIN_NAME:-}" ]; then API_BASE="${API_GATEWAY_ENDPOINT_TEST:-}"; fi
-                    yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-test.yaml
-                    yq -i ".portals.customerPortal.apiBaseUrl = \"$API_BASE\"" $(gitopsChartPath)/values-test.yaml
                     git config user.name "banksphere-ci"
                     git config user.email "ci@banksphere.invalid"
+                    # checkout: self pins to this run's ORIGINAL trigger
+                    # commit, not live main — and UpdateGitOpsDev's own
+                    # commit has ALWAYS already landed on main by the
+                    # time this stage runs (it's an upstream dependency),
+                    # so without this sync every single run would hit a
+                    # non-fast-forward push here, not just occasionally.
+                    git fetch origin main
+                    git reset --hard origin/main
+                    yq -i '.image.tag = "$(imageTag)"' $(gitopsChartPath)/values-test.yaml
+                    yq -i ".portals.customerPortal.apiBaseUrl = \"$API_BASE\"" $(gitopsChartPath)/values-test.yaml
                     git add $(gitopsChartPath)/values-test.yaml
                     git commit -m "ci: promote $(imageTag) to TEST [skip ci]"
                     git push origin HEAD:main
